@@ -1,0 +1,55 @@
+{
+	"name": "discord-embed-router",
+	"version": "0.0.3",
+	"description": "A vite inspired router for discord.js embeds and interactions",
+	"files": [
+		"dist"
+	],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+	"exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+	},
+	"keywords": [
+		"discord",
+		"discord.js",
+		"embeds",
+		"router",
+		"interactions"
+	],
+	"scripts": {
+		"build": "tsup",
+		"lint": "eslint",
+		"format": "prettier . --write"
+	},
+	"homepage": "https://github.com/altrup/discord-embed-router#readme",
+	"bugs": {
+		"url": "https://github.com/altrup/discord-embed-router/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/altrup/discord-embed-router.git"
+	},
+	"license": "MIT",
+	"author": "Eric Liu",
+	"type": "commonjs",
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.6.0",
+		"globals": "^17.7.0",
+		"jiti": "^2.7.0",
+		"prettier": "^3.9.4",
+		"tsup": "^8.5.1",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.62.1"
+	}
+}
