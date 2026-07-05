@@ -1,12 +1,23 @@
 import { APIButtonComponent, ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
-import { BASE_URL } from "./consts";
-import { pathToString } from "./helpers/pathToString";
-import { EmbedRouter } from "./EmbedRouter";
+import { BASE_URL } from "../consts";
+import { pathToString } from "../helpers/pathToString";
+import { EmbedRouter } from "../EmbedRouter";
 
-export class RouteButtonBuilder extends ButtonBuilder {
-	constructor(data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url">) {
+export class RouteButtonBuilder<L> extends ButtonBuilder {
+	private embedRouter: EmbedRouter<L>;
+
+	/**
+	 *
+	 * @param embedRouter the router you want to route with
+	 */
+	constructor(
+		embedRouter: EmbedRouter<L>,
+		data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url">,
+	) {
 		super(data);
+
+		this.embedRouter = embedRouter;
 	}
 
 	/**
@@ -20,7 +31,7 @@ export class RouteButtonBuilder extends ButtonBuilder {
 	}
 
 	/**
-	 * Not supported for RouteButtonBuilder (setTo uses customId)
+	 * Not supported for RouteButtonBuilder (use setTo)
 	 *
 	 * @remarks
 	 * @param
@@ -33,14 +44,13 @@ export class RouteButtonBuilder extends ButtonBuilder {
 	 * Sets the path to route to when clicked
 	 *
 	 * @param path the path to route to
-	 * @param idPrefix the prefix to add before the custom_id
+	 * @param query any query parameters you want to add
 	 */
-	setTo<P extends Path, L>(
-		embedRouter: EmbedRouter<L>,
+	setTo<P extends Path>(
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {
-		const idPrefix = embedRouter.getIdPrefix();
+		const idPrefix = this.embedRouter.getIdPrefix();
 
 		// don't check validity because url params are considered invalid
 		const url = new URL(pathToString(path, false), BASE_URL);

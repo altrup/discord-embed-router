@@ -20,18 +20,18 @@ export const counter = (interaction: Interaction, state: State<Locals>) => {
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder()
+					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Decrease")
 						.setStyle(ButtonStyle.Danger)
-						.setTo(state.embedRouter, state.path, {
+						.setTo(state.path, {
 							value: `${counterValue - 1}`,
 						}),
 				)
 				.addComponents(
-					new RouteButtonBuilder()
+					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Increase")
 						.setStyle(ButtonStyle.Success)
-						.setTo(state.embedRouter, state.path, {
+						.setTo(state.path, {
 							value: `${counterValue + 1}`,
 						}),
 				)

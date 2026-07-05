@@ -23,10 +23,10 @@ export const help = (interaction: Interaction, state: State<Locals>) => {
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder()
+					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Counter")
 						.setStyle(ButtonStyle.Primary)
-						.setTo(state.embedRouter, "/counter"),
+						.setTo("/counter"),
 				)
 				.addComponents(
 					new ButtonBuilder()
