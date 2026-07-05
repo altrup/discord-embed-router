@@ -4,24 +4,13 @@ import {
 	StringSelectMenuOptionBuilder,
 } from "discord.js";
 import { Path } from "path-to-regexp";
-import { pathToString } from "../helpers/pathToString";
-import { BASE_URL } from "../consts";
+import { encodePath } from "../helpers/encodePath";
 
 export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
-	// calculates the string value of a path
-	private static calculateValue<P extends Path>(
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
-	) {
-		const url = new URL(pathToString(path), BASE_URL);
-		if (query) {
-			for (const [key, value] of new URLSearchParams(query)) {
-				url.searchParams.set(key, value);
-			}
-		}
-		return `${url.pathname}${url.search}`;
-	}
-
+	/**
+	 *
+	 * @param data the data to construct a component out of
+	 */
 	constructor(
 		data?: Omit<
 			SelectMenuComponentOptionData | APISelectMenuOption,
@@ -31,7 +20,7 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 		const stringSelectData = data
 			? {
 					...data,
-					value: RouteStringSelectMenuOptionBuilder.calculateValue(data.to),
+					value: encodePath("", data.to),
 				}
 			: undefined;
 		super(stringSelectData);
@@ -59,9 +48,7 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {
-		super.setValue(
-			RouteStringSelectMenuOptionBuilder.calculateValue(path, query),
-		);
+		super.setValue(encodePath("", path, query));
 
 		return this;
 	}

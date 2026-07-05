@@ -5,8 +5,7 @@ import {
 } from "discord.js";
 import { EmbedRouter } from "../EmbedRouter";
 import { Path } from "path-to-regexp";
-import { pathToString } from "../helpers/pathToString";
-import { BASE_URL } from "../consts";
+import { encodePath } from "../helpers/encodePath";
 
 export class RouteUserSelectMenuBuilder<
 	L,
@@ -19,37 +18,36 @@ export class RouteUserSelectMenuBuilder<
 	 * @param embedRouter the router you want to route with
 	 * @param path the path to redirect to, :userId in path will be replaced with the selected user's id
 	 * @param query any query parameters you want to add, :userId will be replaced with the selected user's id
+	 * @param data the data to construct a component out of
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
 		path: P,
-		query: URLSearchParams,
+		query?: ConstructorParameters<typeof URLSearchParams>[0],
 		data?: Partial<UserSelectMenuComponentData | APIUserSelectComponent>,
 	) {
 		super(data);
 
 		this.embedRouter = embedRouter;
 
-		const idPrefix = this.embedRouter.getIdPrefix();
-		const url = new URL(pathToString(path), BASE_URL);
-		if (query) {
-			for (const [key, value] of new URLSearchParams(query)) {
-				url.searchParams.set(key, value);
-			}
-		}
-		const customId = `${idPrefix}${url.pathname}${url.search}`;
-		super.setCustomId(customId);
+		super.setCustomId(
+			encodePath(
+				this.embedRouter.getIdPrefix(),
+				path,
+				new URLSearchParams(query),
+			),
+		);
 	}
 
 	/**
-	 * Not supported for RouteStringSelectMenuBuilder (customId set from embedRouter)
+	 * Not supported for RouteUserSelectMenuBuilder (customId set from embedRouter)
 	 *
 	 * @remarks
 	 * @param
 	 */
 	override setCustomId(): this {
 		throw new Error(
-			"setCustomId is not supported on RouteStringSelectMenuBuilder",
+			"setCustomId is not supported on RouteUserSelectMenuBuilder",
 		);
 	}
 }

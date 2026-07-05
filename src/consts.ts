@@ -1,5 +1,6 @@
 export const ID_PREFIX = "der";
-export const BASE_URL = "x://x";
+// base url is never sent; only used for processing locally
+export const BASE_URL = "discord://embed.router";
 
 export const PUA_START = 0xe000;
 export const PUA_END = 0xf8ff;

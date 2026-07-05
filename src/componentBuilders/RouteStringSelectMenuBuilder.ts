@@ -14,6 +14,7 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	/**
 	 *
 	 * @param embedRouter the router you want to route with
+	 * @param data the data to construct a component out of
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,

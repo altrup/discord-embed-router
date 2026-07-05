@@ -1,6 +1,6 @@
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { compile, match, Path } from "path-to-regexp";
+import { match, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
 	ResolvedRoute,
@@ -16,6 +16,7 @@ import {
 } from "discord.js";
 import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
 import { pathToString } from "./helpers/pathToString";
+import { decodePath } from "./helpers/decodePath";
 
 export class EmbedRouter<L> {
 	// identifier -> embedRouter
@@ -35,6 +36,7 @@ export class EmbedRouter<L> {
 
 	/**
 	 *
+	 * @param name the name to give the router. ensures buttons stay connected across restarts
 	 * @param idPrefix the prefix for RouteButtonBuilder customIds
 	 */
 	constructor({
@@ -130,21 +132,11 @@ export class EmbedRouter<L> {
 		interaction: ButtonInteraction | AnySelectMenuInteraction,
 		locals?: L,
 	) {
-		const customId = interaction.customId;
-		if (!customId.startsWith(this.getIdPrefix())) return;
+		const path = decodePath(this.getIdPrefix(), interaction);
+		if (!path)
+			throw new Error(`Invalid component found: id ${interaction.customId}`);
 
-		if (interaction.isButton()) {
-			const path = customId.slice(this.getIdPrefix().length);
-			this.dispatch(interaction, path, locals);
-		} else if (interaction.isStringSelectMenu()) {
-			const path = interaction.values[0] ?? "";
-			this.dispatch(interaction, path, locals);
-		} else if (interaction.isUserSelectMenu()) {
-			const userId = interaction.values[0] ?? "";
-			const toPath = compile(customId.slice(this.getIdPrefix().length));
-			const path = toPath({ userId });
-			this.dispatch(interaction, path, locals);
-		}
+		this.dispatch(interaction, path, locals);
 	}
 
 	/**
@@ -195,7 +187,7 @@ export class EmbedRouter<L> {
 
 	private resolve<P extends string>(
 		routePath: P,
-	): ResolvedRoute<L, ExtractParams<P>> | null {
+	): ResolvedRoute<L, ExtractParams<P>> | false {
 		const url = new URL(routePath, BASE_URL);
 		for (const route of this.routes) {
 			const result = route.matchFunction(url.pathname);
@@ -210,6 +202,6 @@ export class EmbedRouter<L> {
 				};
 			}
 		}
-		return null;
+		return false;
 	}
 }
