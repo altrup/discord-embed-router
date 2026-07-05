@@ -11,7 +11,7 @@ export type RouteResponse = InteractionEditReplyOptions;
 export type RouteHandler<L, P extends ParamData = ParamData> = (
 	interaction: Interaction,
 	state: State<L, P>,
-) => RouteResponse;
+) => Promise<RouteResponse> | RouteResponse;
 
 export type CompiledRoute<L, P extends ParamData = ParamData> = {
 	path: Path[];

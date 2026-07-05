@@ -160,7 +160,7 @@ export class EmbedRouter<L> {
 		if (!resolvedRoute)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
-		const routeResponse = resolvedRoute.handler(interaction, {
+		const routeResponse = await resolvedRoute.handler(interaction, {
 			...resolvedRoute.state,
 			locals,
 		});
