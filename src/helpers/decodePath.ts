@@ -59,7 +59,7 @@ export const decodePath = ({
 						? "channelId"
 						: interaction.isRoleSelectMenu()
 							? "roleId"
-							: "userId"]: interaction.values[0]!.split("/").slice(1),
+							: "userId"]: interaction.values[0]!,
 				}),
 			),
 		};
