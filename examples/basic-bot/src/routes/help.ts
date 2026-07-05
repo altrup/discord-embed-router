@@ -17,16 +17,16 @@ export const help = (interaction: Interaction, state: State<Locals>) => {
 				.setDescription("The example bot for discord-embed-builder")
 				.addFields({
 					name: "Counter",
-					value: `Use </counter:${state.locals?.commandIds.get("counter")}> to see the example counter page`,
+					value: `Use </catalog:${state.locals?.commandIds.get("catalog")}> to view a list of all commands`,
 				}),
 		],
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
 					new RouteButtonBuilder(state.embedRouter)
-						.setLabel("Counter")
+						.setLabel("Catalog")
 						.setStyle(ButtonStyle.Primary)
-						.setTo("/counter"),
+						.setTo("/catalog"),
 				)
 				.addComponents(
 					new ButtonBuilder()

@@ -7,11 +7,11 @@ import {
 import { router } from "@routes";
 import type { Locals } from "@routes/types";
 
-export const counter = {
+export const catalog = {
 	data: new SlashCommandBuilder()
-		.setName("counter")
-		.setDescription("Simple Counter Implementation"),
+		.setName("catalog")
+		.setDescription("Command Catalog"),
 	async execute(interaction: ChatInputCommandInteraction, locals: Locals) {
-		router.dispatch(interaction, "/counter", locals, [MessageFlags.Ephemeral]);
+		router.dispatch(interaction, "/catalog", locals, [MessageFlags.Ephemeral]);
 	},
 };

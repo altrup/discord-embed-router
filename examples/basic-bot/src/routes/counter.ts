@@ -36,6 +36,14 @@ export const counter = (interaction: Interaction, state: State<Locals>) => {
 						}),
 				)
 				.toJSON(),
+			new ActionRowBuilder()
+				.addComponents(
+					new RouteButtonBuilder(state.embedRouter)
+						.setLabel("Back")
+						.setStyle(ButtonStyle.Secondary)
+						.setTo("/catalog"),
+				)
+				.toJSON(),
 		],
 	};
 };
