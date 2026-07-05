@@ -59,6 +59,7 @@ client.on("interactionCreate", async (interaction) => {
 
 	// ===== THIS IS REQUIRED TO USE CUSTOM ROUTE COMPONENTS =====
 	if (interaction.isButton() || interaction.isAnySelectMenu()) {
+		console.log(interaction.customId);
 		await router.listener(interaction, locals).catch(console.error);
 	}
 

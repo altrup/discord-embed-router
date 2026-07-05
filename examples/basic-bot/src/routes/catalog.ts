@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { ActionRowBuilder, EmbedBuilder, Interaction } from "discord.js";
 import {
 	RouteHandler,
@@ -27,11 +28,15 @@ export const catalog: RouteHandler<"GET", Locals> = (
 							new RouteStringSelectMenuOptionBuilder()
 								.setLabel("Counter")
 								.setDescription("A simple counter page")
-								.setTo("/catalog/counter"),
+								.setTo(join(state.path, "counter")),
 							new RouteStringSelectMenuOptionBuilder()
 								.setLabel("User Info")
 								.setDescription("View someone's user info")
-								.setTo("/catalog/user-info"),
+								.setTo(join(state.path, "user-info")),
+							new RouteStringSelectMenuOptionBuilder()
+								.setLabel("Timer")
+								.setDescription("A sample timer page")
+								.setTo(join(state.path, "timer")),
 						),
 				)
 				.toJSON(),

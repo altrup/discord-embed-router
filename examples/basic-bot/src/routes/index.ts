@@ -4,11 +4,18 @@ import { help } from "@routes/help";
 import { catalog } from "@routes/catalog";
 import { counter } from "@routes/counter";
 import { userInfo } from "@routes/user-info";
+import { timer } from "./timer";
 
 export const router = new EmbedRouter<Locals>();
 
 router.get("/help", help);
-router.get("/catalog", catalog);
-router.get("/catalog/counter", counter);
-router.get("/catalog/user-info", userInfo);
-router.get("/catalog/user-info/{:userId}", userInfo);
+
+const catalogRouter = new EmbedRouter<Locals>();
+
+catalogRouter.get("", catalog);
+catalogRouter.get("/counter", counter);
+catalogRouter.get("/user-info", userInfo);
+catalogRouter.get("/user-info/{:userId}", userInfo);
+catalogRouter.get("/timer", timer);
+
+router.use("/catalog", catalogRouter);
