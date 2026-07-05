@@ -93,7 +93,7 @@ export class EmbedRouter<L> {
 	 * @param routePath path to match with
 	 * @param handler function that generates the message when a path is matched
 	 */
-	on<P extends Path = Path>(
+	get<P extends Path = Path>(
 		routePath: P | P[],
 		handler: RouteHandler<L, ExtractParams<P>>,
 	) {
@@ -113,7 +113,7 @@ export class EmbedRouter<L> {
 	use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
 		const pathString = pathToString(routePath);
 		for (const route of embedRouter.routes) {
-			this.on(
+			this.get(
 				route.path.map((p) => path.posix.join(pathString, pathToString(p))),
 				route.handler,
 			);

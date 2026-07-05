@@ -5,5 +5,5 @@ import { counter } from "@routes/counter";
 
 export const router = new EmbedRouter<Locals>();
 
-router.on("/help", help);
-router.on("/counter", counter);
+router.get("/help", help);
+router.get("/counter", counter);
