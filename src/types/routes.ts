@@ -2,7 +2,7 @@ import { Interaction, InteractionEditReplyOptions } from "discord.js";
 import { MatchFunction, MatchResult, ParamData, Path } from "path-to-regexp";
 
 export type State<P extends ParamData> = MatchResult<P> & {
-	urlParams: Record<string, string>;
+	searchParams: URLSearchParams;
 };
 export type RouteResponse = InteractionEditReplyOptions;
 export type RouteHandler<P extends ParamData> = (

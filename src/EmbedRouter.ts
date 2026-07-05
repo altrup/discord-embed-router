@@ -56,9 +56,12 @@ export default class EmbedRouter {
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
 
-		const resolvedRoute = this.resolve(initialPath);
+		// don't check validity because url params are considered invalid
+		const resolvedRoute = this.resolve(this.pathToString(initialPath, false));
 		if (!resolvedRoute)
-			throw new Error(`No route found for ${this.pathToString(initialPath)}`);
+			throw new Error(
+				`No route found for ${this.pathToString(initialPath, false)}`,
+			);
 
 		const routeResponse = resolvedRoute.handler(
 			interaction,
@@ -85,15 +88,18 @@ export default class EmbedRouter {
 		}
 	}
 
-	private resolve<P extends Path = Path>(
+	private resolve<P extends string>(
 		routePath: P,
 	): ResolvedRoute<ExtractParams<P>> | null {
-		const pathString = this.pathToString(routePath);
+		const url = new URL(routePath, "x://x");
 		for (const route of this.routes) {
-			const result = route.matchFunction(pathString);
+			const result = route.matchFunction(url.pathname);
 			if (result) {
 				return {
-					state: result as State<ExtractParams<P>>,
+					state: {
+						...(result as State<ExtractParams<P>>),
+						searchParams: url.searchParams,
+					},
 					handler: route.handler,
 				};
 			}
@@ -101,7 +107,10 @@ export default class EmbedRouter {
 		return null;
 	}
 
-	private pathToString<P extends Path>(path: P): string {
-		return stringify(path instanceof TokenData ? path : parse(path));
+	private pathToString<P extends Path>(path: P, checkValidity = true): string {
+		if (checkValidity) {
+			return stringify(path instanceof TokenData ? path : parse(path));
+		}
+		return typeof path === "string" ? path : stringify(path);
 	}
 }
