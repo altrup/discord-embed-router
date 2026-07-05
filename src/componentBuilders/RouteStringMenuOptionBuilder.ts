@@ -58,7 +58,9 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {
-		super.setValue(RouteStringSelectMenuOptionBuilder.calculateValue(path, query));
+		super.setValue(
+			RouteStringSelectMenuOptionBuilder.calculateValue(path, query),
+		);
 
 		return this;
 	}
