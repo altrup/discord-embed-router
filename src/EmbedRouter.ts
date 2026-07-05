@@ -11,14 +11,10 @@ import type {
 import type { ExtractParams } from "./types/ExtractParams";
 import {
 	AnySelectMenuInteraction,
-	BitFieldResolvable,
 	ButtonInteraction,
 	Interaction,
-	InteractionEditReplyOptions,
 	InteractionReplyOptions,
-	InteractionResponse,
 	MessageFlags,
-	MessageFlagsBitField,
 	Snowflake,
 } from "discord.js";
 import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
@@ -44,7 +40,7 @@ export class EmbedRouter<L> {
 	#cleanups: Map<
 		Snowflake,
 		{
-			timeout: NodeJS.Timeout;
+			timeout?: NodeJS.Timeout | undefined;
 			cleanupFn: NonNullable<RouteResponse["cleanup"]>;
 			applyFn: ApplyHandler;
 		}
@@ -263,7 +259,6 @@ export class EmbedRouter<L> {
 		if (routeResponse === false)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
-		let response: InteractionResponse | undefined = undefined;
 		if (interaction.replied || interaction.deferred) {
 			if (flags)
 				throw new Error(
@@ -281,9 +276,9 @@ export class EmbedRouter<L> {
 				throw new Error(
 					"You can only set flags for interactions that haven't been replied to",
 				);
-			response = await interaction.update(routeResponse);
+			await interaction.update(routeResponse);
 		} else {
-			response = await interaction.reply({
+			await interaction.reply({
 				...(routeResponse as InteractionReplyOptions),
 				flags,
 			});
@@ -292,30 +287,23 @@ export class EmbedRouter<L> {
 		// Apply cleanup if needed
 		if (!routeResponse?.cleanup) return;
 
-		const messageId = response
-			? response.id
-			: "message" in interaction
-				? interaction.message?.id
-				: undefined;
-		if (messageId === undefined) return;
-
+		const message = await interaction.fetchReply();
 		const channel = interaction.channel;
-		const applyFn = new MessageFlagsBitField(
-			flags as BitFieldResolvable<keyof typeof MessageFlags, number>,
-		).has(MessageFlags.Ephemeral)
+		const applyFn: ApplyHandler | undefined = message.flags.has(
+			MessageFlags.Ephemeral,
+		)
 			? interaction.editReply.bind(interaction)
 			: channel
-				? (options: string | InteractionEditReplyOptions) =>
-						channel.messages.edit(messageId, options)
+				? (options) => channel.messages.edit(message.id, options)
 				: undefined;
 		if (!applyFn)
 			return process.emitWarning(
-				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return reuslts will not be applied to message.`,
+				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return results will not be applied to message.`,
 				"EmbedRouterWarning",
 			);
 
 		this.#addCleanup(
-			messageId,
+			message.id,
 			routeResponse.cleanup.bind(routeResponse),
 			applyFn,
 			routeResponse?.timeout,
@@ -370,7 +358,9 @@ export class EmbedRouter<L> {
 		this.#cleanups.set(messageId, {
 			cleanupFn,
 			applyFn,
-			timeout: setTimeout(() => this.#runCleanup(messageId, true), timeout),
+			timeout: isFinite(timeout)
+				? setTimeout(() => this.#runCleanup(messageId, true), timeout)
+				: undefined,
 		});
 	}
 
