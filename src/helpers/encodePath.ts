@@ -3,14 +3,14 @@ import { BASE_URL, METHOD_TO_ENCODING } from "../consts";
 import { pathToString } from "./pathToString";
 import { Method } from "../types/routes";
 
-export const encodePath = ({
+export const encodePath = <AllowEmptyMethod extends boolean = false>({
 	idPrefix,
 	method,
 	path,
 	query,
 }: {
 	idPrefix: string;
-	method: Method;
+	method: AllowEmptyMethod extends false ? Method : Method | "";
 	path: Path;
 	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 }) => {
@@ -20,5 +20,5 @@ export const encodePath = ({
 			url.searchParams.set(key, value);
 		}
 	}
-	return `${idPrefix}${METHOD_TO_ENCODING[method]}${url.pathname}${url.search}`;
+	return `${idPrefix}${method === "" ? "" : METHOD_TO_ENCODING[method as Method]}${url.pathname}${url.search}`;
 };

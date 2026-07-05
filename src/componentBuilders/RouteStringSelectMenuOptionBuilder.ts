@@ -25,10 +25,10 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 */
 	public setTo<P extends Path>(
 		path: P,
-		{ method = "GET", query }: RouteOptions = {},
+		{ method = "", query }: RouteOptions<true> = {},
 	): this {
 		super.setValue(
-			encodePath({
+			encodePath<true>({
 				idPrefix: "",
 				method,
 				path,

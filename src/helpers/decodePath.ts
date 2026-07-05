@@ -1,5 +1,8 @@
 import { compile, Path } from "path-to-regexp";
-import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
+import {
+	AnySelectMenuInteraction,
+	ButtonInteraction,
+} from "discord.js";
 import { BASE_URL, ENCODING_TO_METHOD } from "../consts";
 import { Method } from "../types/routes";
 
@@ -23,15 +26,18 @@ export const decodePath = ({
 		const { method, path } = res;
 		if (interaction.isStringSelectMenu()) {
 			// also fill in variables for to's
-			const toURL = fillParams(interaction.values[0]!, {
-				ts: interaction.createdTimestamp.toString(),
-			});
+			const toRes = parseOptionalMethodAndPath(interaction.values[0]!);
+			const toURL = toRes
+				? fillParams(toRes.path, {
+						ts: interaction.createdTimestamp.toString(),
+					})
+				: undefined;
 			const pathURL = fillParams(path, {
 				ts: interaction.createdTimestamp.toString(),
-				to: toURL.pathname.split("/").slice(1),
+				to: toURL ? toURL.pathname.split("/").slice(1) : "",
 			});
 			// merge query params
-			for (const [key, value] of toURL.searchParams) {
+			for (const [key, value] of toURL?.searchParams ?? []) {
 				pathURL.searchParams.append(key, value);
 			}
 			return {
@@ -57,18 +63,33 @@ export const decodePath = ({
 	return false;
 };
 
-export const parseMethodAndPath = (
+const parseMethodAndPath = (
 	pathWithMethod: string,
 ): { method: Method; path: string } | false => {
 	// path always start with "/"
 	const firstSlash = pathWithMethod.indexOf("/");
 	// invalid customId
-	if (firstSlash <= 0) return false;
+	if (firstSlash < 0) return false;
 
 	const method = ENCODING_TO_METHOD[pathWithMethod.slice(0, firstSlash)];
 	if (method === undefined) return false;
 	return {
 		method,
+		path: pathWithMethod.slice(firstSlash),
+	};
+};
+
+const parseOptionalMethodAndPath = (
+	pathWithMethod: string,
+): { method: Method | ""; path: string } | false => {
+	// path always start with "/"
+	const firstSlash = pathWithMethod.indexOf("/");
+	// invalid customId
+	if (firstSlash < 0) return false;
+
+	const method = ENCODING_TO_METHOD[pathWithMethod.slice(0, firstSlash)];
+	return {
+		method: method ?? "",
 		path: pathWithMethod.slice(firstSlash),
 	};
 };
