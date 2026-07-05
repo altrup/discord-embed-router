@@ -1,12 +1,12 @@
 import path from "node:path";
-import { match, ParamData, Path } from "path-to-regexp";
-import {
+import { match, Path } from "path-to-regexp";
+import type {
 	CompiledRoute,
 	ResolvedRoute,
 	RouteHandler,
 	State,
 } from "./types/routes";
-import { ExtractParams } from "./types/ExtractParams";
+import type { ExtractParams } from "./types/ExtractParams";
 import {
 	ButtonInteraction,
 	Interaction,
@@ -15,7 +15,7 @@ import {
 import { BASE_URL, ID_PREFIX } from "./consts";
 import { pathToString } from "./helpers/pathToString";
 
-export class EmbedRouter {
+export class EmbedRouter<L> {
 	private static usedIdentifiers = new Set<string>();
 	private static generateUniqueIdentifier(): string {
 		const PUA_START = 0xe000;
@@ -37,7 +37,7 @@ export class EmbedRouter {
 	}
 
 	// All added routes
-	private routes: CompiledRoute<ParamData>[] = [];
+	private routes: CompiledRoute<L>[] = [];
 
 	/**
 	 *
@@ -58,12 +58,12 @@ export class EmbedRouter {
 	 */
 	on<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<ExtractParams<P>>,
+		handler: RouteHandler<L, ExtractParams<P>>,
 	) {
 		this.routes.push({
 			path: Array.isArray(routePath) ? routePath : [routePath],
 			matchFunction: match(routePath),
-			handler: handler as RouteHandler<ParamData>,
+			handler: handler as RouteHandler<L>,
 		});
 	}
 
@@ -73,7 +73,7 @@ export class EmbedRouter {
 	 * @param routePath path of the router
 	 * @param embedRouter router to add at the path
 	 */
-	use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter) {
+	use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
 		const pathString = pathToString(routePath);
 		for (const route of embedRouter.routes) {
 			this.on(
@@ -88,14 +88,14 @@ export class EmbedRouter {
 	 *
 	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
 	 */
-	async listener(interaction: ButtonInteraction) {
+	async listener(interaction: ButtonInteraction, locals?: L) {
 		if (!interaction.isButton()) return;
 
 		const customId = interaction.customId;
 		if (!customId.startsWith(this.idPrefix)) return;
 
 		const path = customId.slice(this.idPrefix.length);
-		this.dispatch(interaction, path);
+		this.dispatch(interaction, path, locals);
 	}
 
 	/**
@@ -108,6 +108,7 @@ export class EmbedRouter {
 	async dispatch<P extends Path = Path>(
 		interaction: Interaction,
 		path: P,
+		locals?: L,
 		flags?: InteractionReplyOptions["flags"],
 	) {
 		if (interaction.isAutocomplete())
@@ -118,10 +119,10 @@ export class EmbedRouter {
 		if (!resolvedRoute)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
-		const routeResponse = resolvedRoute.handler(
-			interaction,
-			resolvedRoute.state,
-		);
+		const routeResponse = resolvedRoute.handler(interaction, {
+			...resolvedRoute.state,
+			locals,
+		});
 
 		if (interaction.replied || interaction.deferred) {
 			if (flags)
@@ -145,15 +146,16 @@ export class EmbedRouter {
 
 	private resolve<P extends string>(
 		routePath: P,
-	): ResolvedRoute<ExtractParams<P>> | null {
+	): ResolvedRoute<L, ExtractParams<P>> | null {
 		const url = new URL(routePath, BASE_URL);
 		for (const route of this.routes) {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
 				return {
 					state: {
-						...(result as State<ExtractParams<P>>),
-						searchParams: url.searchParams,
+						...(result as State<L, ExtractParams<P>>),
+						query: url.searchParams,
+						embedRouter: this,
 					},
 					handler: route.handler,
 				};

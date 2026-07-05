@@ -1,3 +1,3 @@
 # discord-embed-router
 
-A url-based router for discord.js interaction messages
+A url path based router for discord.js interaction messages

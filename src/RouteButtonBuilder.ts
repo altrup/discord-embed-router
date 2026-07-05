@@ -1,10 +1,14 @@
-import { ButtonBuilder } from "discord.js";
+import { APIButtonComponent, ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 import { BASE_URL } from "./consts";
 import { pathToString } from "./helpers/pathToString";
 import { EmbedRouter } from "./EmbedRouter";
 
 export class RouteButtonBuilder extends ButtonBuilder {
+	constructor(data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url">) {
+		super(data);
+	}
+
 	/**
 	 * Not supported for RouteButtonBuilder
 	 *
@@ -31,13 +35,14 @@ export class RouteButtonBuilder extends ButtonBuilder {
 	 * @param path the path to route to
 	 * @param idPrefix the prefix to add before the custom_id
 	 */
-	setTo<P extends Path>(embedRouter: EmbedRouter, path: P) {
+	setTo<P extends Path, L>(embedRouter: EmbedRouter<L>, path: P): this {
 		const idPrefix = embedRouter.getIdPrefix();
 
 		// don't check validity because url params are considered invalid
 		const url = new URL(pathToString(path, false), BASE_URL);
 		const customId = `${idPrefix}${url.pathname}${url.search}`;
-
 		super.setCustomId(customId);
+
+		return this;
 	}
 }
