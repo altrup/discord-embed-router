@@ -1,8 +1,5 @@
 import { compile, Path } from "path-to-regexp";
-import {
-	AnySelectMenuInteraction,
-	ButtonInteraction,
-} from "discord.js";
+import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
 import { BASE_URL, ENCODING_TO_METHOD } from "../consts";
 import { Method } from "../types/routes";
 
@@ -16,14 +13,22 @@ export const decodePath = ({
 	const customId = interaction.customId;
 	if (!customId.startsWith(idPrefix)) return false;
 
+	const res = parseMethodAndPath(customId.slice(idPrefix.length));
+	if (!res) return false;
+	const { method, path } = res;
+
 	if (interaction.isButton()) {
-		return parseMethodAndPath(customId.slice(idPrefix.length));
+		return {
+			method,
+			path: urlToPathString(
+				fillParams(path, {
+					ts: interaction.createdTimestamp.toString(),
+				}),
+			),
+		};
 	} else if (interaction.isAnySelectMenu()) {
 		if (interaction.values.length === 0) return false;
-		const res = parseMethodAndPath(customId.slice(idPrefix.length));
-		if (!res) return false;
 
-		const { method, path } = res;
 		if (interaction.isStringSelectMenu()) {
 			// also fill in variables for to's
 			const toRes = parseOptionalMethodAndPath(interaction.values[0]!);
@@ -103,8 +108,8 @@ const fillParams = (
 
 	url.pathname = toPath(params);
 	for (const [key, value] of url.searchParams) {
-		if (value.startsWith(":") && key.slice(1) in params) {
-			const paramValue = params?.[key.slice(1)];
+		if (value.startsWith(":") && value.slice(1) in params) {
+			const paramValue = params?.[value.slice(1)];
 			if (paramValue) {
 				url.searchParams.set(
 					key,
