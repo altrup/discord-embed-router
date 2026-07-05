@@ -6,12 +6,9 @@ import {
 import { EmbedRouter } from "../EmbedRouter";
 import { Path } from "path-to-regexp";
 import { encodePath } from "../helpers/encodePath";
-import { Method } from "../types/routes";
+import { isSetOptions, SetOptions } from "../types/componentBuilders";
 
-export class RouteRoleSelectMenuBuilder<
-	L,
-	P extends Path,
-> extends RoleSelectMenuBuilder {
+export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -48,15 +45,24 @@ export class RouteRoleSelectMenuBuilder<
 	 * @param query any query parameters you want to add, :roleId will be replaced with the selected user's id
 	 * @param method method to send to route
 	 */
-	public setPattern({
+	public setPattern<P extends Path>({
+		method,
 		path,
 		query,
-		method = "GET",
-	}: {
-		method: Method;
-		path: P;
-		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
-	}): this {
+	}: SetOptions<P>): this;
+	/**
+	 * Sets the path to route to when clicked
+	 *
+	 * @param path the path to route to
+	 */
+	public setPattern<P extends Path>(path: P): this;
+
+	public setPattern<P extends Path>(arg: P | SetOptions<P>) {
+		const {
+			method = "GET",
+			path,
+			query,
+		} = isSetOptions(arg) ? arg : { path: arg };
 		super.setCustomId(
 			encodePath({
 				idPrefix: this.#embedRouter.getIdPrefix(),

@@ -9,12 +9,9 @@ import { Path } from "path-to-regexp";
 import { RouteStringSelectMenuOptionBuilder } from "./RouteStringMenuOptionBuilder";
 import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
-import { Method } from "../types/routes";
+import { isSetOptions, SetOptions } from "../types/componentBuilders";
 
-export class RouteStringSelectMenuBuilder<
-	L,
-	P extends Path,
-> extends StringSelectMenuBuilder {
+export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -124,21 +121,30 @@ export class RouteStringSelectMenuBuilder<
 	}
 
 	/**
-	 * Sets the pattern to redirect to (Optional)
+	 * Sets the pattern to redirect to (Required)
 	 *
 	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
 	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
 	 * @param method method to send to route
 	 */
-	public setPattern({
+	public setPattern<P extends Path>({
+		method,
 		path,
 		query,
-		method = "GET",
-	}: {
-		method: Method;
-		path: P;
-		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
-	}): this {
+	}: SetOptions<P>): this;
+	/**
+	 * Sets the path to route to when clicked
+	 *
+	 * @param path the path to route to
+	 */
+	public setPattern<P extends Path>(path: P): this;
+
+	public setPattern<P extends Path>(arg: P | SetOptions<P>) {
+		const {
+			method = "GET",
+			path,
+			query,
+		} = isSetOptions(arg) ? arg : { path: arg };
 		super.setCustomId(
 			encodePath({
 				idPrefix: this.#embedRouter.getIdPrefix(),

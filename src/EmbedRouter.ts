@@ -222,7 +222,7 @@ export class EmbedRouter<L> {
 		locals,
 	}: {
 		interaction: Interaction;
-		method: Method;
+		method?: Method;
 		path: P;
 		flags?: InteractionReplyOptions["flags"] | undefined;
 		locals?: L | undefined;
