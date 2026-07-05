@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { match, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
@@ -12,28 +13,20 @@ import {
 	Interaction,
 	InteractionReplyOptions,
 } from "discord.js";
-import { BASE_URL, ID_PREFIX } from "./consts";
+import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
 import { pathToString } from "./helpers/pathToString";
 
 export class EmbedRouter<L> {
-	private static usedIdentifiers = new Set<string>();
-	private static generateUniqueIdentifier(): string {
-		const PUA_START = 0xe000;
-		const PUA_END = 0xf8ff;
-		let char: string;
-		do {
-			const codepoint =
-				PUA_START + Math.floor(Math.random() * (PUA_END - PUA_START + 1));
-			char = String.fromCodePoint(codepoint);
-		} while (EmbedRouter.usedIdentifiers.has(char));
-		EmbedRouter.usedIdentifiers.add(char);
-		return char;
-	}
+	// identifier -> embedRouter
+	private static usedIdentifiers = new Map<string, EmbedRouter<unknown>>();
 
+	// Name used to generate prefixes
+	private name = "";
 	// Prefix for customIds of RouteButtonBuilders
-	private idPrefix;
+	private idPrefix: string;
+	private identifier: string = "";
 	getIdPrefix() {
-		return this.idPrefix;
+		return `${this.idPrefix}${this.identifier}`;
 	}
 
 	// All added routes
@@ -43,11 +36,55 @@ export class EmbedRouter<L> {
 	 *
 	 * @param idPrefix the prefix for RouteButtonBuilder customIds
 	 */
-	constructor(idPrefix = ID_PREFIX) {
+	constructor({
+		name = "",
+		idPrefix = ID_PREFIX,
+	}: {
+		name?: string;
+		idPrefix?: string;
+	} = {}) {
+		if (EmbedRouter.usedIdentifiers.size >= PUA_RANGE) {
+			throw new Error(`You can not have more than ${PUA_RANGE} routers`);
+		}
 		if (idPrefix.includes("/")) {
 			throw new Error(`Prefix can't contain "/": ${idPrefix}`);
 		}
-		this.idPrefix = `${idPrefix}${EmbedRouter.generateUniqueIdentifier()}`;
+		this.idPrefix = idPrefix;
+		this.name = name;
+		this.updateIdentifier();
+	}
+
+	private updateIdentifier() {
+		// Private Use Area: Unicode Characters not from any language
+		const hash = createHash("sha256").update(this.name).digest();
+		let raw = hash.readUint32BE(0);
+		let char: string;
+		const nameCollisions = [];
+		// find next available identifier
+		while (true) {
+			const codepoint = PUA_START + (raw++ % PUA_RANGE);
+			char = String.fromCodePoint(codepoint);
+
+			const collisionRouter = EmbedRouter.usedIdentifiers.get(char);
+			if (collisionRouter === undefined) break; // no collisions
+
+			if (this.name.length > 0 && collisionRouter.name.length === 0) {
+				// evict old name; usedIdentifier is still taken
+				collisionRouter.updateIdentifier();
+				break;
+			}
+
+			nameCollisions.push(collisionRouter);
+		}
+		EmbedRouter.usedIdentifiers.set(char, this as EmbedRouter<unknown>);
+
+		if (nameCollisions.length > 0 && this.name.length > 0) {
+			process.emitWarning(
+				`EmbedRouter identifier collision for name "${this.name}" with ${nameCollisions.map((c) => `"${c.name}"`).join(", ")}`,
+				"EmbedRouterWarning",
+			);
+		}
+		this.identifier = char;
 	}
 
 	/**
@@ -92,9 +129,9 @@ export class EmbedRouter<L> {
 		if (!interaction.isButton()) return;
 
 		const customId = interaction.customId;
-		if (!customId.startsWith(this.idPrefix)) return;
+		if (!customId.startsWith(this.getIdPrefix())) return;
 
-		const path = customId.slice(this.idPrefix.length);
+		const path = customId.slice(this.getIdPrefix().length);
 		this.dispatch(interaction, path, locals);
 	}
 

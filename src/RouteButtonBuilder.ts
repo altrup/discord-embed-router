@@ -35,7 +35,11 @@ export class RouteButtonBuilder extends ButtonBuilder {
 	 * @param path the path to route to
 	 * @param idPrefix the prefix to add before the custom_id
 	 */
-	setTo<P extends Path, L>(embedRouter: EmbedRouter<L>, path: P, query?: ConstructorParameters<typeof URLSearchParams>[0]): this {
+	setTo<P extends Path, L>(
+		embedRouter: EmbedRouter<L>,
+		path: P,
+		query?: ConstructorParameters<typeof URLSearchParams>[0],
+	): this {
 		const idPrefix = embedRouter.getIdPrefix();
 
 		// don't check validity because url params are considered invalid
