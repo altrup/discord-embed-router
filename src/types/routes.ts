@@ -7,7 +7,14 @@ export type State<L, P extends ParamData = ParamData> = MatchResult<P> & {
 	locals?: L | undefined;
 	query: URLSearchParams;
 };
-export type RouteResponse = InteractionEditReplyOptions | undefined;
+export type RouteResponse = InteractionEditReplyOptions &
+	(
+		| { cleanup?: undefined; timeout?: undefined }
+		| {
+				cleanup: CleanupHandler;
+				timeout: number;
+		  }
+	);
 export type RouteHandler<
 	M extends Method,
 	L,
@@ -18,6 +25,13 @@ export type RouteHandler<
 ) => M extends "GET"
 	? Promise<RouteResponse> | RouteResponse
 	: Promise<RouteResponse | undefined> | RouteResponse | undefined;
+export type CleanupHandler = () =>
+	| Promise<InteractionEditReplyOptions | undefined>
+	| InteractionEditReplyOptions
+	| undefined;
+export type ApplyHandler = (
+	options: string | InteractionEditReplyOptions,
+) => Promise<unknown>;
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type CompiledRoute<

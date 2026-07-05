@@ -2,6 +2,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { match, MatchResult, Path } from "path-to-regexp";
 import type {
+	ApplyHandler,
 	CompiledRoute,
 	Method,
 	RouteHandler,
@@ -10,9 +11,15 @@ import type {
 import type { ExtractParams } from "./types/ExtractParams";
 import {
 	AnySelectMenuInteraction,
+	BitFieldResolvable,
 	ButtonInteraction,
 	Interaction,
+	InteractionEditReplyOptions,
 	InteractionReplyOptions,
+	InteractionResponse,
+	MessageFlags,
+	MessageFlagsBitField,
+	Snowflake,
 } from "discord.js";
 import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
 import { pathToString } from "./helpers/pathToString";
@@ -33,6 +40,15 @@ export class EmbedRouter<L> {
 
 	// All added routes
 	#routes: Map<Method, CompiledRoute<Method, L>[]> = new Map();
+	// message.id -> cleanup object
+	#cleanups: Map<
+		Snowflake,
+		{
+			timeout: NodeJS.Timeout;
+			cleanupFn: NonNullable<RouteResponse["cleanup"]>;
+			applyFn: ApplyHandler;
+		}
+	> = new Map();
 
 	/**
 	 *
@@ -198,6 +214,11 @@ export class EmbedRouter<L> {
 		interaction: ButtonInteraction | AnySelectMenuInteraction,
 		locals?: L | undefined,
 	) {
+		if (interaction.isAutocomplete())
+			throw new Error("Autocomplete Interactions aren't supported");
+
+		this.#runCleanup(interaction.message.id, false);
+
 		const res = decodePath({ idPrefix: this.getIdPrefix(), interaction });
 		if (!res)
 			throw new Error(`Invalid component found: id ${interaction.customId}`);
@@ -225,7 +246,7 @@ export class EmbedRouter<L> {
 			method?: Method;
 			flags?: InteractionReplyOptions["flags"] | undefined;
 			locals?: L | undefined;
-		},
+		} = {},
 	) {
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
@@ -239,6 +260,7 @@ export class EmbedRouter<L> {
 		if (routeResponse === false)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
+		let response: InteractionResponse | undefined = undefined;
 		if (interaction.replied || interaction.deferred) {
 			if (flags)
 				throw new Error(
@@ -256,13 +278,45 @@ export class EmbedRouter<L> {
 				throw new Error(
 					"You can only set flags for interactions that haven't been replied to",
 				);
-			await interaction.update(routeResponse);
+			response = await interaction.update(routeResponse);
 		} else {
-			interaction.reply({
+			response = await interaction.reply({
 				...(routeResponse as InteractionReplyOptions),
 				flags,
 			});
 		}
+
+		// Apply cleanup if needed
+		if (!routeResponse?.cleanup) return;
+
+		const messageId = response
+			? response.id
+			: "message" in interaction
+				? interaction.message?.id
+				: undefined;
+		if (messageId === undefined) return;
+
+		const channel = interaction.channel;
+		const applyFn = new MessageFlagsBitField(
+			flags as BitFieldResolvable<keyof typeof MessageFlags, number>,
+		).has(MessageFlags.Ephemeral)
+			? interaction.editReply.bind(interaction)
+			: channel
+				? (options: string | InteractionEditReplyOptions) =>
+						channel.messages.edit(messageId, options)
+				: undefined;
+		if (!applyFn)
+			return process.emitWarning(
+				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return reuslts will not be applied to message.`,
+				"EmbedRouterWarning",
+			);
+
+		this.#addCleanup(
+			messageId,
+			routeResponse.cleanup.bind(routeResponse),
+			applyFn,
+			routeResponse?.timeout,
+		);
 	}
 
 	/**
@@ -285,7 +339,7 @@ export class EmbedRouter<L> {
 			method?: Method;
 			locals?: L | undefined;
 		},
-	): Promise<RouteResponse | false> {
+	): Promise<RouteResponse | undefined | false> {
 		// don't check validity because url params are considered invalid
 		const url = new URL(pathToString(path, false), BASE_URL);
 		for (const route of this.#routes.get(method) ?? []) {
@@ -300,5 +354,39 @@ export class EmbedRouter<L> {
 			}
 		}
 		return false;
+	}
+
+	// Helpers for using and storing cleanup functions
+	#addCleanup(
+		messageId: Snowflake,
+		cleanupFn: NonNullable<RouteResponse["cleanup"]>,
+		applyFn: ApplyHandler,
+		timeout: number,
+	) {
+		this.#removeCleanup(messageId);
+		this.#cleanups.set(messageId, {
+			cleanupFn,
+			applyFn,
+			timeout: setTimeout(() => this.#runCleanup(messageId, true), timeout),
+		});
+	}
+
+	#removeCleanup(messageId: Snowflake) {
+		const cleanup = this.#cleanups.get(messageId);
+		if (!cleanup) return;
+
+		clearTimeout(cleanup.timeout);
+		this.#cleanups.delete(messageId);
+	}
+
+	async #runCleanup(messageId: Snowflake, applyResult: boolean) {
+		const cleanup = this.#cleanups.get(messageId);
+		if (!cleanup) return;
+
+		this.#removeCleanup(messageId);
+		const result = await cleanup?.cleanupFn();
+		if (applyResult && result) {
+			await cleanup.applyFn(result).catch(console.error);
+		}
 	}
 }
