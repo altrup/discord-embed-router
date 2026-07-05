@@ -10,6 +10,7 @@
 		"deploy-commands:production": "node dist/deploy-commands.js",
 		"build": "tsup",
 		"lint": "eslint",
+		"typecheck": "tsc --noEmit",
 		"format": "prettier . --write"
 	},
 	"keywords": [],

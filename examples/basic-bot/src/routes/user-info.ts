@@ -13,7 +13,7 @@ import {
 } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const userInfo: RouteHandler<Locals> = async (
+export const userInfo: RouteHandler<"GET", Locals> = async (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {

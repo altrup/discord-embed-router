@@ -7,7 +7,7 @@ import {
 } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const catalog: RouteHandler<Locals> = (
+export const catalog: RouteHandler<"GET", Locals> = (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {

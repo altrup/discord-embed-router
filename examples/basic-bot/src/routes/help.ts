@@ -8,7 +8,7 @@ import {
 import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const help: RouteHandler<Locals> = (
+export const help: RouteHandler<"GET", Locals> = (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {

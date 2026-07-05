@@ -7,7 +7,7 @@ import {
 import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const counter: RouteHandler<Locals> = (
+export const counter: RouteHandler<"GET", Locals> = (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {
@@ -26,16 +26,22 @@ export const counter: RouteHandler<Locals> = (
 					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Decrease")
 						.setStyle(ButtonStyle.Danger)
-						.setTo(state.path, {
-							value: `${counterValue - 1}`,
+						.setTo({
+							path: state.path,
+							query: {
+								value: `${counterValue - 1}`,
+							},
 						}),
 				)
 				.addComponents(
 					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Increase")
 						.setStyle(ButtonStyle.Success)
-						.setTo(state.path, {
-							value: `${counterValue + 1}`,
+						.setTo({
+							path: state.path,
+							query: {
+								value: `${counterValue + 1}`,
+							},
 						}),
 				)
 				.toJSON(),

@@ -48,5 +48,5 @@
 		"target": "ESNext",
 		"useDefineForClassFields": true
 	},
-	"include": ["src"],
+	"include": ["src"]
 }
