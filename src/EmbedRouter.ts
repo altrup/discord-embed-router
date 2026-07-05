@@ -130,13 +130,16 @@ export class EmbedRouter<L> {
 		interaction: ButtonInteraction | AnySelectMenuInteraction,
 		locals?: L,
 	) {
-		if (!interaction.isButton() && !interaction.isAnySelectMenu()) return;
-
 		const customId = interaction.customId;
 		if (!customId.startsWith(this.getIdPrefix())) return;
 
-		const path = customId.slice(this.getIdPrefix().length);
-		this.dispatch(interaction, path, locals);
+		if (interaction.isButton()) {
+			const path = customId.slice(this.getIdPrefix().length);
+			this.dispatch(interaction, path, locals);
+		} else if (interaction.isStringSelectMenu()) {
+			const path = interaction.values[0] ?? "";
+			this.dispatch(interaction, path, locals);
+		}
 	}
 
 	/**
