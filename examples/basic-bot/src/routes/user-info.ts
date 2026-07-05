@@ -1,6 +1,15 @@
-import { join }from "node:path"
-import { ActionRowBuilder, ButtonStyle, EmbedBuilder, Interaction } from "discord.js";
-import { RouteButtonBuilder, RouteUserSelectMenuBuilder, State } from "discord-embed-router";
+import { join } from "node:path";
+import {
+	ActionRowBuilder,
+	ButtonStyle,
+	EmbedBuilder,
+	Interaction,
+} from "discord.js";
+import {
+	RouteButtonBuilder,
+	RouteUserSelectMenuBuilder,
+	State,
+} from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
 export const userInfo = async (
@@ -13,7 +22,7 @@ export const userInfo = async (
 		typeof userId === "string"
 			? await interaction.client.users.fetch(userId)
 			: null;
-	console.log("hello?");
+
 	return {
 		embeds: [
 			new EmbedBuilder()
@@ -57,7 +66,7 @@ export const userInfo = async (
 						.setStyle(ButtonStyle.Secondary)
 						.setTo("/catalog"),
 				)
-				.toJSON(), 
+				.toJSON(),
 		],
 	};
 };
