@@ -5,10 +5,10 @@ import {
 	StringSelectMenuBuilder,
 	StringSelectMenuComponentData,
 } from "discord.js";
-import { RouteSelectMenuOptionBuilder } from "./RouteSelectMenuOptionBuilder";
+import { RouteStringSelectMenuOptionBuilder } from "./RouteStringMenuOptionBuilder";
 import { EmbedRouter } from "../EmbedRouter";
 
-export class RouteSelectMenuBuilder<L> extends StringSelectMenuBuilder {
+export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	private embedRouter: EmbedRouter<L>;
 
 	/**
@@ -42,16 +42,16 @@ export class RouteSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 */
 	public addTos(
 		...tos: RestOrArray<
-			| RouteSelectMenuOptionBuilder
-			| ConstructorParameters<typeof RouteSelectMenuOptionBuilder>[0]
+			| RouteStringSelectMenuOptionBuilder
+			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
 		>
 	): this {
 		const resolved = normalizeArray(tos);
 		super.addOptions(
 			resolved.map((o) =>
-				o instanceof RouteSelectMenuOptionBuilder
+				o instanceof RouteStringSelectMenuOptionBuilder
 					? o
-					: new RouteSelectMenuOptionBuilder(o),
+					: new RouteStringSelectMenuOptionBuilder(o),
 			),
 		);
 		return this;

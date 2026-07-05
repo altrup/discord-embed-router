@@ -7,7 +7,7 @@ import { Path } from "path-to-regexp";
 import { pathToString } from "../helpers/pathToString";
 import { BASE_URL } from "../consts";
 
-export class RouteSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
+export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
 	// calculates the string value of a path
 	private static calculateValue<P extends Path>(
 		path: P,
@@ -32,7 +32,7 @@ export class RouteSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder 
 		const stringSelectData = data
 			? {
 					...data,
-					value: RouteSelectMenuOptionBuilder.calculateValue(data.to),
+					value: RouteStringSelectMenuOptionBuilder.calculateValue(data.to),
 				}
 			: undefined;
 		super(stringSelectData);
@@ -58,7 +58,7 @@ export class RouteSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder 
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {
-		super.setValue(RouteSelectMenuOptionBuilder.calculateValue(path, query));
+		super.setValue(RouteStringSelectMenuOptionBuilder.calculateValue(path, query));
 
 		return this;
 	}

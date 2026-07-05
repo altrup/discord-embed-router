@@ -1,6 +1,6 @@
 export { EmbedRouter } from "./EmbedRouter";
 export { RouteButtonBuilder } from "./componentBuilders/RouteButtonBuilder";
-export { RouteSelectMenuBuilder } from "./componentBuilders/RouteSelectMenuBuilder";
-export { RouteSelectMenuOptionBuilder } from "./componentBuilders/RouteSelectMenuOptionBuilder";
+export { RouteStringSelectMenuBuilder as RouteSelectMenuBuilder } from "./componentBuilders/RouteStringSelectMenuBuilder";
+export { RouteStringSelectMenuOptionBuilder as RouteSelectMenuOptionBuilder } from "./componentBuilders/RouteStringMenuOptionBuilder";
 
 export type * from "./types/routes";
