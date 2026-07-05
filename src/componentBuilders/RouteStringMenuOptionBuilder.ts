@@ -44,7 +44,7 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 * @param path the path to route to
 	 * @param query any query parameters you want to add
 	 */
-	setTo<P extends Path>(
+	public setTo<P extends Path>(
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {

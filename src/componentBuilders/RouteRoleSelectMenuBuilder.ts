@@ -16,21 +16,15 @@ export class RouteRoleSelectMenuBuilder<
 	/**
 	 *
 	 * @param embedRouter the router you want to route with
-	 * @param path the path to redirect to, :roleId in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :roleId will be replaced with the selected user's id
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
 		data?: Partial<RoleSelectMenuComponentData | APIRoleSelectComponent>,
 	) {
 		super(data);
 
 		this.#embedRouter = embedRouter;
-
-		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
 	}
 
 	/**
@@ -43,5 +37,21 @@ export class RouteRoleSelectMenuBuilder<
 		throw new Error(
 			"setCustomId is not supported on RouteRoleSelectMenuBuilder",
 		);
+	}
+
+
+	/**
+	 * Sets the pattern to redirect to (Required)
+	 *
+	 * @param path the path to redirect to, :roleId in path will be replaced with the selected user's id
+	 * @param query any query parameters you want to add, :roleId will be replaced with the selected user's id
+	 */
+	public setPattern(
+		path: P,
+		query?: ConstructorParameters<typeof URLSearchParams>[0],
+	): this {
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
+
+		return this;
 	}
 }

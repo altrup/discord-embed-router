@@ -52,10 +52,8 @@ export const userInfo: RouteHandler<Locals> = async (
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteUserSelectMenuBuilder(
-						state.embedRouter,
-						join(state.path.replace(userId ?? "", ""), ":userId"),
-					)
+					new RouteUserSelectMenuBuilder(state.embedRouter)
+						.setPattern(join(state.path.replace(userId ?? "", ""), ":userId"))
 						.setPlaceholder("Choose a user")
 						.setDefaultUsers(userId ? [userId] : []),
 				)

@@ -25,21 +25,13 @@ export class RouteStringSelectMenuBuilder<
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		path: P | string = "/*to",
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
 		data?: Partial<StringSelectMenuComponentData | APIStringSelectComponent>,
 	) {
 		super(data);
 
 		this.#embedRouter = embedRouter;
 
-		super.setCustomId(
-			encodePath(
-				this.#embedRouter.getIdPrefix(),
-				path,
-				new URLSearchParams(query),
-			),
-		);
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), "/*to"));
 	}
 
 	/**
@@ -119,6 +111,21 @@ export class RouteStringSelectMenuBuilder<
 					: new RouteStringSelectMenuOptionBuilder(o),
 			),
 		);
+		return this;
+	}
+
+	/**
+	 * Sets the pattern to redirect to (Optional)
+	 *
+	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
+	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 */
+	public setPattern(
+		path: P,
+		query?: ConstructorParameters<typeof URLSearchParams>[0],
+	): this {
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
+
 		return this;
 	}
 }
