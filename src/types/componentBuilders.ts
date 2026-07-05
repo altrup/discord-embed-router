@@ -19,7 +19,7 @@ export const isSetOptions = <P extends Path>(
 		"path" in u &&
 		typeof u.path === "string" &&
 		(!("query" in u) ||
-			("query" in u && (typeof u.query) in ["object", "string"]) ||
+			("query" in u && ["object", "string"].includes(typeof u.query)) ||
 			u.query === undefined)
 	);
 };

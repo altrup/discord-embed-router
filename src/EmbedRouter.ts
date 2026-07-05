@@ -1,12 +1,11 @@
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { match, Path } from "path-to-regexp";
+import { match, MatchResult, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
 	Method,
 	RouteHandler,
 	RouteResponse,
-	State,
 } from "./types/routes";
 import type { ExtractParams } from "./types/ExtractParams";
 import {
@@ -293,7 +292,7 @@ export class EmbedRouter<L> {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
 				return await route.handler(interaction, {
-					...(result as State<L, ExtractParams<P>>),
+					...(result as MatchResult<ExtractParams<P>>),
 					query: url.searchParams,
 					embedRouter: this,
 					locals,
