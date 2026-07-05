@@ -1,12 +1,16 @@
 import { ActionRowBuilder, EmbedBuilder, Interaction } from "discord.js";
 import {
+	RouteHandler,
 	RouteStringSelectMenuBuilder,
 	RouteStringSelectMenuOptionBuilder,
 	State,
 } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const catalog = (interaction: Interaction, state: State<Locals>) => {
+export const catalog: RouteHandler<Locals> = (
+	interaction: Interaction,
+	state: State<Locals>,
+) => {
 	return {
 		embeds: [
 			new EmbedBuilder()

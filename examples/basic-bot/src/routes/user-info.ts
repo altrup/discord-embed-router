@@ -7,12 +7,13 @@ import {
 } from "discord.js";
 import {
 	RouteButtonBuilder,
+	RouteHandler,
 	RouteUserSelectMenuBuilder,
 	State,
 } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const userInfo = async (
+export const userInfo: RouteHandler<Locals> = async (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {

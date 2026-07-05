@@ -4,10 +4,13 @@ import {
 	EmbedBuilder,
 	Interaction,
 } from "discord.js";
-import { RouteButtonBuilder, State } from "discord-embed-router";
+import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const counter = (interaction: Interaction, state: State<Locals>) => {
+export const counter: RouteHandler<Locals> = (
+	interaction: Interaction,
+	state: State<Locals>,
+) => {
 	const counterValue = parseInt(state.query.get("value") ?? "0");
 
 	return {

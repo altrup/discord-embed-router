@@ -5,10 +5,13 @@ import {
 	EmbedBuilder,
 	Interaction,
 } from "discord.js";
-import { RouteButtonBuilder, State } from "discord-embed-router";
+import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
 import type { Locals } from "@routes/types";
 
-export const help = (interaction: Interaction, state: State<Locals>) => {
+export const help: RouteHandler<Locals> = (
+	interaction: Interaction,
+	state: State<Locals>,
+) => {
 	return {
 		embeds: [
 			new EmbedBuilder()
