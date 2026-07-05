@@ -5,25 +5,41 @@ import {
 	StringSelectMenuBuilder,
 	StringSelectMenuComponentData,
 } from "discord.js";
+import { Path } from "path-to-regexp";
 import { RouteStringSelectMenuOptionBuilder } from "./RouteStringMenuOptionBuilder";
 import { EmbedRouter } from "../EmbedRouter";
+import { encodePath } from "../helpers/encodePath";
 
-export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
+export class RouteStringSelectMenuBuilder<
+	L,
+	P extends Path,
+> extends StringSelectMenuBuilder {
 	private embedRouter: EmbedRouter<L>;
 
 	/**
 	 *
 	 * @param embedRouter the router you want to route with
+	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
+	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
+		path: P | string = "/*to",
+		query?: ConstructorParameters<typeof URLSearchParams>[0],
 		data?: Partial<StringSelectMenuComponentData | APIStringSelectComponent>,
 	) {
 		super(data);
 
 		this.embedRouter = embedRouter;
-		super.setCustomId(this.embedRouter.getIdPrefix());
+
+		super.setCustomId(
+			encodePath(
+				this.embedRouter.getIdPrefix(),
+				path,
+				new URLSearchParams(query),
+			),
+		);
 	}
 
 	/**

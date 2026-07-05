@@ -12,18 +12,24 @@ export const decodePath = (
 	if (interaction.isButton()) {
 		return customId.slice(idPrefix.length);
 	} else if (interaction.isStringSelectMenu()) {
-		return interaction.values[0] ?? false;
-	} else if (interaction.isChannelSelectMenu()) {
+		if (interaction.values.length === 0) return false;
 		return fillParams(customId.slice(idPrefix.length), {
-			channelId: interaction.values[0] ?? "",
+			to: interaction.values[0]!.split("/").slice(1),
+		});
+	} else if (interaction.isChannelSelectMenu()) {
+		if (interaction.values.length === 0) return false;
+		return fillParams(customId.slice(idPrefix.length), {
+			channelId: interaction.values[0],
 		});
 	} else if (interaction.isRoleSelectMenu()) {
+		if (interaction.values.length === 0) return false;
 		return fillParams(customId.slice(idPrefix.length), {
-			roleId: interaction.values[0] ?? "",
+			roleId: interaction.values[0],
 		});
 	} else if (interaction.isUserSelectMenu()) {
+		if (interaction.values.length === 0) return false;
 		return fillParams(customId.slice(idPrefix.length), {
-			userId: interaction.values[0] ?? "",
+			userId: interaction.values[0],
 		});
 	}
 
