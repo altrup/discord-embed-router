@@ -13,7 +13,9 @@ export type RouteHandler<L, P extends ParamData = ParamData> = (
 	state: State<L, P>,
 ) => Promise<RouteResponse> | RouteResponse;
 
+export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type CompiledRoute<L, P extends ParamData = ParamData> = {
+	method: Method;
 	path: Path[];
 	matchFunction: MatchFunction<P>;
 	handler: RouteHandler<L, P>;

@@ -1,39 +1,57 @@
 import { compile, Path } from "path-to-regexp";
 import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
-import { BASE_URL } from "../consts";
+import { BASE_URL, ENCODING_TO_METHOD } from "../consts";
+import { Method } from "../types/routes";
 
-export const decodePath = (
-	idPrefix: string,
-	interaction: ButtonInteraction | AnySelectMenuInteraction,
-): Path | false => {
+export const decodePath = ({
+	idPrefix,
+	interaction,
+}: {
+	idPrefix: string;
+	interaction: ButtonInteraction | AnySelectMenuInteraction;
+}): { method: Method; path: Path } | false => {
 	const customId = interaction.customId;
 	if (!customId.startsWith(idPrefix)) return false;
 
 	if (interaction.isButton()) {
-		return customId.slice(idPrefix.length);
-	} else if (interaction.isStringSelectMenu()) {
+		return parseMethodAndPath(customId.slice(idPrefix.length));
+	} else if (interaction.isAnySelectMenu()) {
 		if (interaction.values.length === 0) return false;
-		return fillParams(customId.slice(idPrefix.length), {
-			to: interaction.values[0]!.split("/").slice(1),
-		});
-	} else if (interaction.isChannelSelectMenu()) {
-		if (interaction.values.length === 0) return false;
-		return fillParams(customId.slice(idPrefix.length), {
-			channelId: interaction.values[0],
-		});
-	} else if (interaction.isRoleSelectMenu()) {
-		if (interaction.values.length === 0) return false;
-		return fillParams(customId.slice(idPrefix.length), {
-			roleId: interaction.values[0],
-		});
-	} else if (interaction.isUserSelectMenu()) {
-		if (interaction.values.length === 0) return false;
-		return fillParams(customId.slice(idPrefix.length), {
-			userId: interaction.values[0],
-		});
+		const res = parseMethodAndPath(customId.slice(idPrefix.length));
+		if (!res) return false;
+
+		const { method, path } = res;
+		return {
+			method,
+			path: fillParams(path, {
+				[interaction.isStringSelectMenu()
+					? "to"
+					: interaction.isChannelSelectMenu()
+						? "channelId"
+						: interaction.isRoleSelectMenu()
+							? "roleId"
+							: "userId"]: interaction.values[0]!.split("/").slice(1),
+			}),
+		};
 	}
 
 	return false;
+};
+
+export const parseMethodAndPath = (
+	pathWithMethod: string,
+): { method: Method; path: string } | false => {
+	// path always start with "/"
+	const firstSlash = pathWithMethod.indexOf("/");
+	// invalid customId
+	if (firstSlash <= 0) return false;
+
+	const method = ENCODING_TO_METHOD[pathWithMethod.slice(0, firstSlash)];
+	if (method === undefined) return false;
+	return {
+		method,
+		path: pathWithMethod.slice(firstSlash),
+	};
 };
 
 const fillParams = (

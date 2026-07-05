@@ -9,6 +9,7 @@ import { Path } from "path-to-regexp";
 import { RouteStringSelectMenuOptionBuilder } from "./RouteStringMenuOptionBuilder";
 import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
+import { Method } from "../types/routes";
 
 export class RouteStringSelectMenuBuilder<
 	L,
@@ -25,13 +26,21 @@ export class RouteStringSelectMenuBuilder<
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?: Partial<StringSelectMenuComponentData | APIStringSelectComponent>,
+		data?:
+			| Partial<StringSelectMenuComponentData | APIStringSelectComponent>
+			| undefined,
 	) {
 		super(data);
 
 		this.#embedRouter = embedRouter;
 
-		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), "/*to"));
+		super.setCustomId(
+			encodePath({
+				idPrefix: this.#embedRouter.getIdPrefix(),
+				method: "GET",
+				path: "/*to",
+			}),
+		);
 	}
 
 	/**
@@ -119,12 +128,25 @@ export class RouteStringSelectMenuBuilder<
 	 *
 	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
 	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 * @param method method to send to route
 	 */
-	public setPattern(
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
-	): this {
-		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
+	public setPattern({
+		path,
+		query,
+		method = "GET",
+	}: {
+		method: Method;
+		path: P;
+		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+	}): this {
+		super.setCustomId(
+			encodePath({
+				idPrefix: this.#embedRouter.getIdPrefix(),
+				method,
+				path,
+				query,
+			}),
+		);
 
 		return this;
 	}

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { match, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
+	Method,
 	ResolvedRoute,
 	RouteHandler,
 	State,
@@ -32,7 +33,7 @@ export class EmbedRouter<L> {
 	}
 
 	// All added routes
-	#routes: CompiledRoute<L>[] = [];
+	#routes: Map<Method, CompiledRoute<L>[]> = new Map();
 
 	/**
 	 *
@@ -43,8 +44,8 @@ export class EmbedRouter<L> {
 		name = "",
 		idPrefix = ID_PREFIX,
 	}: {
-		name?: string;
-		idPrefix?: string;
+		name?: string | undefined;
+		idPrefix?: string | undefined;
 	} = {}) {
 		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
 			throw new Error(`You can not have more than ${PUA_RANGE} routers`);
@@ -90,6 +91,21 @@ export class EmbedRouter<L> {
 		this.#identifier = char;
 	}
 
+	#addRoute<P extends Path = Path>(
+		method: Method,
+		routePath: P | P[],
+		handler: RouteHandler<L, ExtractParams<P>>,
+	) {
+		const methodRoutes = this.#routes.get(method) ?? [];
+		methodRoutes.push({
+			method,
+			path: Array.isArray(routePath) ? routePath : [routePath],
+			matchFunction: match(routePath),
+			handler: handler as RouteHandler<L>,
+		});
+		this.#routes.set(method, methodRoutes);
+	}
+
 	/**
 	 * Registers a path with the router
 	 *
@@ -100,11 +116,59 @@ export class EmbedRouter<L> {
 		routePath: P | P[],
 		handler: RouteHandler<L, ExtractParams<P>>,
 	) {
-		this.#routes.push({
-			path: Array.isArray(routePath) ? routePath : [routePath],
-			matchFunction: match(routePath),
-			handler: handler as RouteHandler<L>,
-		});
+		this.#addRoute("GET", routePath, handler);
+	}
+
+	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that generates the message when a path is matched
+	 */
+	public post<P extends Path = Path>(
+		routePath: P | P[],
+		handler: RouteHandler<L, ExtractParams<P>>,
+	) {
+		this.#addRoute("POST", routePath, handler);
+	}
+
+	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that generates the message when a path is matched
+	 */
+	public put<P extends Path = Path>(
+		routePath: P | P[],
+		handler: RouteHandler<L, ExtractParams<P>>,
+	) {
+		this.#addRoute("PUT", routePath, handler);
+	}
+
+	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that generates the message when a path is matched
+	 */
+	public patch<P extends Path = Path>(
+		routePath: P | P[],
+		handler: RouteHandler<L, ExtractParams<P>>,
+	) {
+		this.#addRoute("PATCH", routePath, handler);
+	}
+
+	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that generates the message when a path is matched
+	 */
+	public delete<P extends Path = Path>(
+		routePath: P | P[],
+		handler: RouteHandler<L, ExtractParams<P>>,
+	) {
+		this.#addRoute("DELETE", routePath, handler);
 	}
 
 	/**
@@ -115,11 +179,14 @@ export class EmbedRouter<L> {
 	 */
 	public use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
 		const pathString = pathToString(routePath);
-		for (const route of embedRouter.#routes) {
-			this.get(
-				route.path.map((p) => path.posix.join(pathString, pathToString(p))),
-				route.handler,
-			);
+		for (const [method, routes] of embedRouter.#routes) {
+			for (const route of routes) {
+				this.#addRoute(
+					method,
+					route.path.map((p) => path.posix.join(pathString, pathToString(p))),
+					route.handler,
+				);
+			}
 		}
 	}
 
@@ -130,13 +197,13 @@ export class EmbedRouter<L> {
 	 */
 	public async listener(
 		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		locals?: L,
+		locals?: L | undefined,
 	) {
-		const path = decodePath(this.getIdPrefix(), interaction);
-		if (!path)
+		const res = decodePath({ idPrefix: this.getIdPrefix(), interaction });
+		if (!res)
 			throw new Error(`Invalid component found: id ${interaction.customId}`);
 
-		this.dispatch(interaction, path, locals);
+		this.dispatch({ interaction, method: res.method, path: res.path, locals });
 	}
 
 	/**
@@ -144,19 +211,27 @@ export class EmbedRouter<L> {
 	 *
 	 * @param interaction interaction to connect to
 	 * @param path path to route the interaction to
+	 * @param method method to send to route
 	 * @param flags optional discord flags to send with message (only allowed on first reply)
 	 */
-	public async dispatch<P extends Path = Path>(
-		interaction: Interaction,
-		path: P,
-		locals?: L,
-		flags?: InteractionReplyOptions["flags"],
-	) {
+	public async dispatch<P extends Path = Path>({
+		interaction,
+		method = "GET",
+		path,
+		flags,
+		locals,
+	}: {
+		interaction: Interaction;
+		method: Method;
+		path: P;
+		flags?: InteractionReplyOptions["flags"] | undefined;
+		locals?: L | undefined;
+	}) {
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
 
 		// don't check validity because url params are considered invalid
-		const resolvedRoute = this.#resolve(pathToString(path, false));
+		const resolvedRoute = this.#resolve(method, pathToString(path, false));
 		if (!resolvedRoute)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
@@ -186,10 +261,11 @@ export class EmbedRouter<L> {
 	}
 
 	#resolve<P extends string>(
+		method: Method,
 		routePath: P,
 	): ResolvedRoute<L, ExtractParams<P>> | false {
 		const url = new URL(routePath, BASE_URL);
-		for (const route of this.#routes) {
+		for (const route of this.#routes.get(method) ?? []) {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
 				return {

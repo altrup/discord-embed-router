@@ -6,6 +6,7 @@ import {
 import { EmbedRouter } from "../EmbedRouter";
 import { Path } from "path-to-regexp";
 import { encodePath } from "../helpers/encodePath";
+import { Method } from "../types/routes";
 
 export class RouteChannelSelectMenuBuilder<
 	L,
@@ -20,7 +21,9 @@ export class RouteChannelSelectMenuBuilder<
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?: Partial<ChannelSelectMenuComponentData | APIChannelSelectComponent>,
+		data?:
+			| Partial<ChannelSelectMenuComponentData | APIChannelSelectComponent>
+			| undefined,
 	) {
 		super(data);
 
@@ -41,15 +44,28 @@ export class RouteChannelSelectMenuBuilder<
 
 	/**
 	 * Sets the pattern to redirect to (Required)
-	 * 
+	 *
 	 * @param path the path to redirect to, :channelId in path will be replaced with the selected user's id
 	 * @param query any query parameters you want to add, :channelId will be replaced with the selected user's id
+	 * @param method method to send to route
 	 */
-	public setPattern(
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
-	): this {
-		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
+	public setPattern({
+		path,
+		query,
+		method = "GET",
+	}: {
+		method: Method;
+		path: P;
+		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+	}): this {
+		super.setCustomId(
+			encodePath({
+				idPrefix: this.#embedRouter.getIdPrefix(),
+				method,
+				path,
+				query,
+			}),
+		);
 
 		return this;
 	}

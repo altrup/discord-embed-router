@@ -1,17 +1,24 @@
 import { Path } from "path-to-regexp";
-import { BASE_URL } from "../consts";
+import { BASE_URL, METHOD_TO_ENCODING } from "../consts";
 import { pathToString } from "./pathToString";
+import { Method } from "../types/routes";
 
-export const encodePath = (
-	idPrefix: string,
-	path: Path,
-	query?: ConstructorParameters<typeof URLSearchParams>[0],
-) => {
+export const encodePath = ({
+	idPrefix,
+	method,
+	path,
+	query,
+}: {
+	idPrefix: string;
+	method: Method;
+	path: Path;
+	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+}) => {
 	const url = new URL(pathToString(path), BASE_URL);
 	if (query) {
 		for (const [key, value] of new URLSearchParams(query)) {
 			url.searchParams.set(key, value);
 		}
 	}
-	return `${idPrefix}${url.pathname}${url.search}`;
+	return `${idPrefix}${METHOD_TO_ENCODING[method]}${url.pathname}${url.search}`;
 };

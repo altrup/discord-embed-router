@@ -1,31 +1,9 @@
-import {
-	APISelectMenuOption,
-	SelectMenuComponentOptionData,
-	StringSelectMenuOptionBuilder,
-} from "discord.js";
+import { StringSelectMenuOptionBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 import { encodePath } from "../helpers/encodePath";
+import { Method } from "../types/routes";
 
 export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
-	/**
-	 *
-	 * @param data the data to construct a component out of
-	 */
-	constructor(
-		data?: Omit<
-			SelectMenuComponentOptionData | APISelectMenuOption,
-			"value"
-		> & { to: string },
-	) {
-		const stringSelectData = data
-			? {
-					...data,
-					value: encodePath("", data.to),
-				}
-			: undefined;
-		super(stringSelectData);
-	}
-
 	/**
 	 * Not supported for RouteStringSelectMenuOptionBuilder (use setTo)
 	 *
@@ -43,12 +21,25 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 *
 	 * @param path the path to route to
 	 * @param query any query parameters you want to add
+	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>(
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
-	): this {
-		super.setValue(encodePath("", path, query));
+	public setTo<P extends Path>({
+		path,
+		query,
+		method = "GET",
+	}: {
+		path: P;
+		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+		method: Method;
+	}): this {
+		super.setValue(
+			encodePath({
+				idPrefix: "",
+				method,
+				path,
+				query,
+			}),
+		);
 
 		return this;
 	}

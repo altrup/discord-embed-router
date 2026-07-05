@@ -2,6 +2,7 @@ import { APIButtonComponent, ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
+import { Method } from "../types/routes";
 
 export class RouteButtonBuilder<L> extends ButtonBuilder {
 	#embedRouter: EmbedRouter<L>;
@@ -13,7 +14,7 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url">,
+		data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url"> | undefined,
 	) {
 		super(data);
 
@@ -45,12 +46,25 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	 *
 	 * @param path the path to route to
 	 * @param query any query parameters you want to add
+	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>(
-		path: P,
-		query?: ConstructorParameters<typeof URLSearchParams>[0],
-	): this {
-		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
+	public setTo<P extends Path>({
+		path,
+		query,
+		method = "GET",
+	}: {
+		method: Method;
+		path: P;
+		query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+	}): this {
+		super.setCustomId(
+			encodePath({
+				idPrefix: this.#embedRouter.getIdPrefix(),
+				method,
+				path,
+				query,
+			}),
+		);
 
 		return this;
 	}
