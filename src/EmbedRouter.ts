@@ -9,6 +9,7 @@ import type {
 } from "./types/routes";
 import type { ExtractParams } from "./types/ExtractParams";
 import {
+	AnySelectMenuInteraction,
 	ButtonInteraction,
 	Interaction,
 	InteractionReplyOptions,
@@ -125,8 +126,11 @@ export class EmbedRouter<L> {
 	 *
 	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
 	 */
-	public async listener(interaction: ButtonInteraction, locals?: L) {
-		if (!interaction.isButton()) return;
+	public async listener(
+		interaction: ButtonInteraction | AnySelectMenuInteraction,
+		locals?: L,
+	) {
+		if (!interaction.isButton() && !interaction.isAnySelectMenu()) return;
 
 		const customId = interaction.customId;
 		if (!customId.startsWith(this.getIdPrefix())) return;
