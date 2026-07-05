@@ -1,4 +1,5 @@
 import path from "node:path";
+import EventEmitter from "node:events";
 import { createHash } from "node:crypto";
 import { match, MatchResult, Path } from "path-to-regexp";
 import type {
@@ -20,8 +21,13 @@ import {
 import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
 import { pathToString } from "./helpers/pathToString";
 import { decodePath } from "./helpers/decodePath";
+import { Args, EventNames, Listener } from "./types/EmbedRouterEvents";
 
-export class EmbedRouter<L> {
+type EmbedRouterEvents = {
+	routeError: [err: Error, interaction?: Interaction | undefined];
+};
+
+export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 	// identifier -> embedRouter
 	static #usedIdentifiers = new Map<string, EmbedRouter<unknown>>();
 
@@ -58,6 +64,8 @@ export class EmbedRouter<L> {
 		name?: string | undefined;
 		idPrefix?: string | undefined;
 	} = {}) {
+		super();
+
 		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
 			throw new Error(`You can not have more than ${PUA_RANGE} routers`);
 		}
@@ -213,16 +221,27 @@ export class EmbedRouter<L> {
 		interaction: ButtonInteraction | AnySelectMenuInteraction,
 		locals?: L | undefined,
 	) {
-		if (interaction.isAutocomplete())
-			throw new Error("Autocomplete Interactions aren't supported");
+		try {
+			if (interaction.isAutocomplete())
+				throw new Error("Autocomplete Interactions aren't supported");
 
-		this.#runCleanup(interaction.message.id, false);
+			await this.#runCleanup(interaction.message.id, false);
 
-		const res = decodePath({ idPrefix: this.getIdPrefix(), interaction });
-		if (!res)
-			throw new Error(`Invalid component found: id ${interaction.customId}`);
+			const res = decodePath({ idPrefix: this.getIdPrefix(), interaction });
+			if (!res)
+				throw new Error(`Invalid component found: id ${interaction.customId}`);
 
-		this.dispatch(interaction, res.path, { method: res.method, locals });
+			await this.dispatch(interaction, res.path, {
+				method: res.method,
+				locals,
+			});
+		} catch (e: unknown) {
+			this.emit(
+				"routeError",
+				e instanceof Error ? e : new Error(String(e)),
+				interaction,
+			);
+		}
 	}
 
 	/**
@@ -376,10 +395,33 @@ export class EmbedRouter<L> {
 		const cleanup = this.#cleanups.get(messageId);
 		if (!cleanup) return;
 
-		this.#removeCleanup(messageId);
-		const result = await cleanup?.cleanupFn();
-		if (applyResult && result) {
-			await cleanup.applyFn(result).catch(console.error);
+		try {
+			this.#removeCleanup(messageId);
+			const result = await cleanup?.cleanupFn();
+			if (applyResult && result) {
+				await cleanup.applyFn(result).catch(console.error);
+			}
+		} catch (e: unknown) {
+			this.emit(
+				"routeError",
+				e instanceof Error ? e : new Error(String(e)),
+				undefined,
+			);
 		}
+	}
+
+	// event helpers
+	public onError(listener: Listener<EmbedRouterEvents, "routeError">) {
+		return this.on("routeError", listener);
+	}
+
+	override emit<E extends string | symbol>(
+		eventName: EventNames<EmbedRouterEvents, E>,
+		...args: Args<EmbedRouterEvents, E>
+	): boolean {
+		if (eventName === "routeError" && this.listenerCount(eventName) === 0) {
+			console.error(args);
+		}
+		return super.emit(eventName, ...args);
 	}
 }
