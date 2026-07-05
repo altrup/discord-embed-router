@@ -4,8 +4,8 @@ import { match, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
 	Method,
-	ResolvedRoute,
 	RouteHandler,
+	RouteResponse,
 	State,
 } from "./types/routes";
 import type { ExtractParams } from "./types/ExtractParams";
@@ -33,7 +33,7 @@ export class EmbedRouter<L> {
 	}
 
 	// All added routes
-	#routes: Map<Method, CompiledRoute<L>[]> = new Map();
+	#routes: Map<Method, CompiledRoute<Method, L>[]> = new Map();
 
 	/**
 	 *
@@ -91,17 +91,17 @@ export class EmbedRouter<L> {
 		this.#identifier = char;
 	}
 
-	#addRoute<P extends Path = Path>(
-		method: Method,
+	#addRoute<M extends Method, P extends Path = Path>(
+		method: M,
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<M, L, ExtractParams<P>>,
 	) {
 		const methodRoutes = this.#routes.get(method) ?? [];
 		methodRoutes.push({
 			method,
 			path: Array.isArray(routePath) ? routePath : [routePath],
 			matchFunction: match(routePath),
-			handler: handler as RouteHandler<L>,
+			handler: handler as RouteHandler<M, L>,
 		});
 		this.#routes.set(method, methodRoutes);
 	}
@@ -114,7 +114,7 @@ export class EmbedRouter<L> {
 	 */
 	public get<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<"GET", L, ExtractParams<P>>,
 	) {
 		this.#addRoute("GET", routePath, handler);
 	}
@@ -127,7 +127,7 @@ export class EmbedRouter<L> {
 	 */
 	public post<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<"POST", L, ExtractParams<P>>,
 	) {
 		this.#addRoute("POST", routePath, handler);
 	}
@@ -140,7 +140,7 @@ export class EmbedRouter<L> {
 	 */
 	public put<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<"PUT", L, ExtractParams<P>>,
 	) {
 		this.#addRoute("PUT", routePath, handler);
 	}
@@ -153,7 +153,7 @@ export class EmbedRouter<L> {
 	 */
 	public patch<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<"PATCH", L, ExtractParams<P>>,
 	) {
 		this.#addRoute("PATCH", routePath, handler);
 	}
@@ -166,7 +166,7 @@ export class EmbedRouter<L> {
 	 */
 	public delete<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<L, ExtractParams<P>>,
+		handler: RouteHandler<"DELETE", L, ExtractParams<P>>,
 	) {
 		this.#addRoute("DELETE", routePath, handler);
 	}
@@ -207,12 +207,13 @@ export class EmbedRouter<L> {
 	}
 
 	/**
-	 * Connect or update an interaction message to a path
+	 * Replies to or editReplies to an interaction based on the route output
 	 *
 	 * @param interaction interaction to connect to
 	 * @param path path to route the interaction to
 	 * @param method method to send to route
-	 * @param flags optional discord flags to send with message (only allowed on first reply)
+	 * @param flags discord flags to send with message (optional, only allowed on first reply)
+	 * @param locals additional info to pass in to page through state.local (optional)
 	 */
 	public async dispatch<P extends Path = Path>({
 		interaction,
@@ -231,21 +232,27 @@ export class EmbedRouter<L> {
 			throw new Error("Autocomplete Interactions aren't supported");
 
 		// don't check validity because url params are considered invalid
-		const resolvedRoute = this.#resolve(method, pathToString(path, false));
-		if (!resolvedRoute)
-			throw new Error(`No route found for ${pathToString(path, false)}`);
-
-		const routeResponse = await resolvedRoute.handler(interaction, {
-			...resolvedRoute.state,
+		const routeResponse = await this.#resolve({
+			interaction,
+			method,
+			path,
 			locals,
 		});
+		if (routeResponse === false)
+			throw new Error(`No route found for ${pathToString(path, false)}`);
 
 		if (interaction.replied || interaction.deferred) {
 			if (flags)
 				throw new Error(
 					"You can only set flags for interactions that haven't been replied to",
 				);
-			await interaction.editReply(routeResponse);
+			if (routeResponse) await interaction.editReply(routeResponse);
+		} else if (!routeResponse) {
+			if ("deferUpdate" in interaction) {
+				await interaction.deferUpdate();
+			} else {
+				await interaction.deferReply();
+			}
 		} else if ("update" in interaction) {
 			if (flags)
 				throw new Error(
@@ -260,22 +267,37 @@ export class EmbedRouter<L> {
 		}
 	}
 
-	#resolve<P extends string>(
-		method: Method,
-		routePath: P,
-	): ResolvedRoute<L, ExtractParams<P>> | false {
-		const url = new URL(routePath, BASE_URL);
+	/**
+	 * Resolves a route to the associated message (DOES NOT UPDATE MESSAGE)
+	 *
+	 * @param interaction interaction to connect to
+	 * @param path path to route the interaction to
+	 * @param method method to send to route
+	 * @param locals additional info to pass in to page through state.local (optional)
+	 * @returns discord message associated with route OR false
+	 */
+	async #resolve<P extends Path>({
+		interaction,
+		method = "GET",
+		path,
+		locals,
+	}: {
+		interaction: Interaction;
+		method?: Method;
+		path: P;
+		locals?: L | undefined;
+	}): Promise<RouteResponse | false> {
+		// don't check validity because url params are considered invalid
+		const url = new URL(pathToString(path, false), BASE_URL);
 		for (const route of this.#routes.get(method) ?? []) {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
-				return {
-					state: {
-						...(result as State<L, ExtractParams<P>>),
-						query: url.searchParams,
-						embedRouter: this,
-					},
-					handler: route.handler,
-				};
+				return await route.handler(interaction, {
+					...(result as State<L, ExtractParams<P>>),
+					query: url.searchParams,
+					embedRouter: this,
+					locals,
+				});
 			}
 		}
 		return false;

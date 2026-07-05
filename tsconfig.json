@@ -17,6 +17,7 @@
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
 		"strict": true,
+		"skipLibCheck": true,
 
 		// Modules
 		"allowArbitraryExtensions": false,
@@ -47,5 +48,5 @@
 		"target": "ESNext",
 		"useDefineForClassFields": true
 	},
-	"include": ["src"]
+	"include": ["src"],
 }
