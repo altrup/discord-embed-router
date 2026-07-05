@@ -13,13 +13,17 @@ export const decodePath = (
 		return customId.slice(idPrefix.length);
 	} else if (interaction.isStringSelectMenu()) {
 		return interaction.values[0] ?? false;
-	} else if (interaction.isUserSelectMenu()) {
+	} else if (interaction.isChannelSelectMenu()) {
 		return fillParams(customId.slice(idPrefix.length), {
-			userId: interaction.values[0] ?? "",
+			channelId: interaction.values[0] ?? "",
 		});
 	} else if (interaction.isRoleSelectMenu()) {
 		return fillParams(customId.slice(idPrefix.length), {
 			roleId: interaction.values[0] ?? "",
+		});
+	} else if (interaction.isUserSelectMenu()) {
+		return fillParams(customId.slice(idPrefix.length), {
+			userId: interaction.values[0] ?? "",
 		});
 	}
 
