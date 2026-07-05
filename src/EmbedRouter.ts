@@ -25,7 +25,7 @@ export class EmbedRouter<L> {
 	// Prefix for customIds of RouteButtonBuilders
 	private idPrefix: string;
 	private identifier: string = "";
-	getIdPrefix() {
+	public getIdPrefix() {
 		return `${this.idPrefix}${this.identifier}`;
 	}
 
@@ -93,7 +93,7 @@ export class EmbedRouter<L> {
 	 * @param routePath path to match with
 	 * @param handler function that generates the message when a path is matched
 	 */
-	get<P extends Path = Path>(
+	public get<P extends Path = Path>(
 		routePath: P | P[],
 		handler: RouteHandler<L, ExtractParams<P>>,
 	) {
@@ -110,7 +110,7 @@ export class EmbedRouter<L> {
 	 * @param routePath path of the router
 	 * @param embedRouter router to add at the path
 	 */
-	use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
+	public use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
 		const pathString = pathToString(routePath);
 		for (const route of embedRouter.routes) {
 			this.get(
@@ -125,7 +125,7 @@ export class EmbedRouter<L> {
 	 *
 	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
 	 */
-	async listener(interaction: ButtonInteraction, locals?: L) {
+	public async listener(interaction: ButtonInteraction, locals?: L) {
 		if (!interaction.isButton()) return;
 
 		const customId = interaction.customId;
@@ -142,7 +142,7 @@ export class EmbedRouter<L> {
 	 * @param path path to route the interaction to
 	 * @param flags optional discord flags to send with message (only allowed on first reply)
 	 */
-	async dispatch<P extends Path = Path>(
+	public async dispatch<P extends Path = Path>(
 		interaction: Interaction,
 		path: P,
 		locals?: L,
