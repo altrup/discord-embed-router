@@ -192,7 +192,10 @@ export class EmbedRouter<L> {
 	 * @param routePath path of the router
 	 * @param embedRouter router to add at the path
 	 */
-	public use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
+	public use<P extends Path = Path>(
+		routePath: P,
+		embedRouter: EmbedRouter<Partial<L>>,
+	) {
 		const pathString = pathToString(routePath);
 		for (const [method, routes] of embedRouter.#routes) {
 			for (const route of routes) {
