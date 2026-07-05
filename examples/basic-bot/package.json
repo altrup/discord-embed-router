@@ -1,0 +1,35 @@
+{
+	"name": "basic-bot",
+	"version": "0.0.1",
+	"description": "example project using discord-embed-router",
+	"main": "index.js",
+	"scripts": {
+		"dev": "tsx watch src/index.ts",
+		"deploy-commands": "tsx src/deploy-commands.ts",
+		"start": "node dist/index.js",
+		"deploy-commands:production": "node dist/deploy-commands.js",
+		"build": "tsup",
+		"lint": "eslint",
+		"format": "prettier . --write"
+	},
+	"keywords": [],
+	"author": "Eric Liu",
+	"license": "MIT",
+	"type": "commonjs",
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.6.0",
+		"globals": "^17.7.0",
+		"prettier": "^3.9.4",
+		"tsup": "^8.5.1",
+		"tsx": "^4.23.0",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.62.1"
+	},
+	"dependencies": {
+		"discord-embed-router": "file:../..",
+		"discord.js": "^14.26.4",
+		"dotenv": "^17.4.2",
+		"is-online": "^12.0.2"
+	}
+}

@@ -1,0 +1,52 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig.json",
+	// Mapped from https://www.typescriptlang.org/tsconfig
+	"compilerOptions": {
+		// File Layout
+		"rootDir": "./src",
+		"outDir": "./dist",
+		"paths": {
+			"@config": ["./src/config"],
+			"@commands/*": ["./src/commands/*"],
+			"@commands": ["./src/commands"],
+			"@routes/*": ["./src/routes/*"],
+			"@routes": ["./src/routes"]
+		},
+		"ignoreDeprecations": "6.0",
+
+		// Environment Settings
+		// See also https://aka.ms/tsconfig/module
+		"module": "nodenext",
+		"target": "esnext",
+		// "types": [],
+		// For nodejs:
+		"lib": ["esnext"],
+		"types": ["node"],
+		// and npm install -D @types/node
+
+		// Other Outputs
+		"sourceMap": true,
+		"declaration": true,
+		"declarationMap": true,
+
+		// Stricter Typechecking Options
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+
+		// Style Options
+		"removeComments": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": false,
+		"forceConsistentCasingInFileNames": true,
+
+		// Recommended Options
+		"strict": true,
+		"strictNullChecks": true,
+		"jsx": "react-jsx",
+		"isolatedModules": true,
+		"noUncheckedSideEffectImports": true,
+		"moduleDetection": "force",
+		"skipLibCheck": true
+	},
+	"include": ["src"]
+}
