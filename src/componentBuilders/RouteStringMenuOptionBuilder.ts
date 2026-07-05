@@ -1,7 +1,7 @@
 import { StringSelectMenuOptionBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 import { encodePath } from "../helpers/encodePath";
-import { isSetOptions, SetOptions } from "../types/componentBuilders";
+import { RouteOptions } from "../types/componentBuilders";
 
 export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
 	/**
@@ -17,26 +17,16 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	}
 
 	/**
-	 * Sets the path to route to when clicked
+	 * Sets the path to route to when selected
 	 *
 	 * @param path the path to route to
 	 * @param query any query parameters you want to add
 	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>({ method, path, query }: SetOptions<P>): this;
-	/**
-	 * Sets the path to route to when clicked
-	 *
-	 * @param path the path to route to
-	 */
-	public setTo<P extends Path>(path: P): this;
-
-	public setTo<P extends Path>(arg: P | SetOptions<P>) {
-		const {
-			method = "GET",
-			path,
-			query,
-		} = isSetOptions(arg) ? arg : { path: arg };
+	public setTo<P extends Path>(
+		path: P,
+		{ method = "GET", query }: RouteOptions = {},
+	): this {
 		super.setValue(
 			encodePath({
 				idPrefix: "",

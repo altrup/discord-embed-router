@@ -26,8 +26,7 @@ export const counter: RouteHandler<"GET", Locals> = (
 					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Decrease")
 						.setStyle(ButtonStyle.Danger)
-						.setTo({
-							path: state.path,
+						.setTo(state.path, {
 							query: {
 								value: `${counterValue - 1}`,
 							},
@@ -37,8 +36,7 @@ export const counter: RouteHandler<"GET", Locals> = (
 					new RouteButtonBuilder(state.embedRouter)
 						.setLabel("Increase")
 						.setStyle(ButtonStyle.Success)
-						.setTo({
-							path: state.path,
+						.setTo(state.path, {
 							query: {
 								value: `${counterValue + 1}`,
 							},

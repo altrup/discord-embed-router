@@ -12,9 +12,7 @@ export const help = {
 		.setName("help")
 		.setDescription("Getting started"),
 	async execute(interaction: ChatInputCommandInteraction, locals: Locals) {
-		router.dispatch({
-			interaction,
-			path: "/help",
+		router.dispatch(interaction, "/help", {
 			locals,
 			flags: [MessageFlags.Ephemeral],
 		});

@@ -12,9 +12,7 @@ export const catalog = {
 		.setName("catalog")
 		.setDescription("Command Catalog"),
 	async execute(interaction: ChatInputCommandInteraction, locals: Locals) {
-		router.dispatch({
-			interaction,
-			path: "/catalog",
+		router.dispatch(interaction, "/catalog", {
 			locals,
 			flags: [MessageFlags.Ephemeral],
 		});

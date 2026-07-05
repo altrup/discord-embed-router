@@ -202,7 +202,7 @@ export class EmbedRouter<L> {
 		if (!res)
 			throw new Error(`Invalid component found: id ${interaction.customId}`);
 
-		this.dispatch({ interaction, method: res.method, path: res.path, locals });
+		this.dispatch(interaction, res.path, { method: res.method, locals });
 	}
 
 	/**
@@ -214,27 +214,26 @@ export class EmbedRouter<L> {
 	 * @param flags discord flags to send with message (optional, only allowed on first reply)
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 */
-	public async dispatch<P extends Path = Path>({
-		interaction,
-		method = "GET",
-		path,
-		flags,
-		locals,
-	}: {
-		interaction: Interaction;
-		method?: Method;
-		path: P;
-		flags?: InteractionReplyOptions["flags"] | undefined;
-		locals?: L | undefined;
-	}) {
+	public async dispatch<P extends Path = Path>(
+		interaction: Interaction,
+		path: P,
+		{
+			method = "GET",
+			flags,
+			locals,
+		}: {
+			method?: Method;
+			flags?: InteractionReplyOptions["flags"] | undefined;
+			locals?: L | undefined;
+		},
+	) {
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
 
 		// don't check validity because url params are considered invalid
-		const routeResponse = await this.#resolve({
+		const routeResponse = await this.#resolve(path, {
 			interaction,
 			method,
-			path,
 			locals,
 		});
 		if (routeResponse === false)
@@ -275,17 +274,18 @@ export class EmbedRouter<L> {
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 * @returns discord message associated with route OR false
 	 */
-	async #resolve<P extends Path>({
-		interaction,
-		method = "GET",
-		path,
-		locals,
-	}: {
-		interaction: Interaction;
-		method?: Method;
-		path: P;
-		locals?: L | undefined;
-	}): Promise<RouteResponse | false> {
+	async #resolve<P extends Path>(
+		path: P,
+		{
+			interaction,
+			method = "GET",
+			locals,
+		}: {
+			interaction: Interaction;
+			method?: Method;
+			locals?: L | undefined;
+		},
+	): Promise<RouteResponse | false> {
 		// don't check validity because url params are considered invalid
 		const url = new URL(pathToString(path, false), BASE_URL);
 		for (const route of this.#routes.get(method) ?? []) {

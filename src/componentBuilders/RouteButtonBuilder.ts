@@ -2,7 +2,7 @@ import { APIButtonComponent, ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
-import { isSetOptions, SetOptions } from "../types/componentBuilders";
+import { RouteOptions } from "../types/componentBuilders";
 
 export class RouteButtonBuilder<L> extends ButtonBuilder {
 	#embedRouter: EmbedRouter<L>;
@@ -48,20 +48,10 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	 * @param query any query parameters you want to add
 	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>({ method, path, query }: SetOptions<P>): this;
-	/**
-	 * Sets the path to route to when clicked
-	 *
-	 * @param path the path to route to
-	 */
-	public setTo<P extends Path>(path: P): this;
-
-	public setTo<P extends Path>(arg: P | SetOptions<P>) {
-		const {
-			method = "GET",
-			path,
-			query,
-		} = isSetOptions(arg) ? arg : { path: arg };
+	public setTo<P extends Path>(
+		path: P,
+		{ method = "GET", query }: RouteOptions = {},
+	): this {
 		super.setCustomId(
 			encodePath({
 				idPrefix: this.#embedRouter.getIdPrefix(),
