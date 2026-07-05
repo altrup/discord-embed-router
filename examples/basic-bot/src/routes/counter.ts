@@ -13,7 +13,7 @@ export const counter = (interaction: Interaction, state: State<Locals>) => {
 	return {
 		embeds: [
 			new EmbedBuilder()
-				.setColor("#7a74c5")
+				.setColor("#748fc5")
 				.setTitle("Counter")
 				.setDescription(`**${counterValue}**`),
 		],

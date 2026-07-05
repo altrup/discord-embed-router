@@ -12,11 +12,7 @@ export const catalog = (interaction: Interaction, state: State<Locals>) => {
 			new EmbedBuilder()
 				.setColor("#7a74c5")
 				.setTitle("Catalog")
-				.setDescription(`All pages in this bot`)
-				.addFields({
-					name: "Counter",
-					value: "A simple counter page",
-				}),
+				.setDescription(`All pages in this bot`),
 		],
 		components: [
 			new ActionRowBuilder()
@@ -26,7 +22,12 @@ export const catalog = (interaction: Interaction, state: State<Locals>) => {
 						.setTos(
 							new RouteStringSelectMenuOptionBuilder()
 								.setLabel("Counter")
+								.setDescription("A simple counter page")
 								.setTo("/catalog/counter"),
+							new RouteStringSelectMenuOptionBuilder()
+								.setLabel("User Info")
+								.setDescription("View someone's user info")
+								.setTo("/catalog/user-info"),
 						),
 				)
 				.toJSON(),

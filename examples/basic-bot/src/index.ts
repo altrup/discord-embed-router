@@ -57,7 +57,7 @@ client.on("interactionCreate", async (interaction) => {
 		commandIds,
 	};
 
-	// ===== THIS IS REQUIRED TO USE ROUTEBUTTONBUILDER =====
+	// ===== THIS IS REQUIRED TO USE CUSTOM ROUTE COMPONENTS =====
 	if (interaction.isButton() || interaction.isAnySelectMenu()) {
 		await router.listener(interaction, locals).catch(console.error);
 	}
