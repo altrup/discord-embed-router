@@ -20,19 +20,19 @@ import { decodePath } from "./helpers/decodePath";
 
 export class EmbedRouter<L> {
 	// identifier -> embedRouter
-	private static usedIdentifiers = new Map<string, EmbedRouter<unknown>>();
+	static #usedIdentifiers = new Map<string, EmbedRouter<unknown>>();
 
 	// Name used to generate prefixes
-	private name = "";
+	#name = "";
 	// Prefix for customIds of RouteButtonBuilders
-	private idPrefix: string;
-	private identifier: string = "";
+	#idPrefix: string;
+	#identifier: string = "";
 	public getIdPrefix() {
-		return `${this.idPrefix}${this.identifier}`;
+		return `${this.#idPrefix}${this.#identifier}`;
 	}
 
 	// All added routes
-	private routes: CompiledRoute<L>[] = [];
+	#routes: CompiledRoute<L>[] = [];
 
 	/**
 	 *
@@ -46,20 +46,20 @@ export class EmbedRouter<L> {
 		name?: string;
 		idPrefix?: string;
 	} = {}) {
-		if (EmbedRouter.usedIdentifiers.size >= PUA_RANGE) {
+		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
 			throw new Error(`You can not have more than ${PUA_RANGE} routers`);
 		}
 		if (idPrefix.includes("/")) {
 			throw new Error(`Prefix can't contain "/": ${idPrefix}`);
 		}
-		this.idPrefix = idPrefix;
-		this.name = name;
-		this.updateIdentifier();
+		this.#idPrefix = idPrefix;
+		this.#name = name;
+		this.#updateIdentifier();
 	}
 
-	private updateIdentifier() {
+	#updateIdentifier() {
 		// Private Use Area: Unicode Characters not from any language
-		const hash = createHash("sha256").update(this.name).digest();
+		const hash = createHash("sha256").update(this.#name).digest();
 		let raw = hash.readUint32BE(0);
 		let char: string;
 		const nameCollisions = [];
@@ -68,26 +68,26 @@ export class EmbedRouter<L> {
 			const codepoint = PUA_START + (raw++ % PUA_RANGE);
 			char = String.fromCodePoint(codepoint);
 
-			const collisionRouter = EmbedRouter.usedIdentifiers.get(char);
+			const collisionRouter = EmbedRouter.#usedIdentifiers.get(char);
 			if (collisionRouter === undefined) break; // no collisions
 
-			if (this.name.length > 0 && collisionRouter.name.length === 0) {
+			if (this.#name.length > 0 && collisionRouter.#name.length === 0) {
 				// evict old name; usedIdentifier is still taken
-				collisionRouter.updateIdentifier();
+				collisionRouter.#updateIdentifier();
 				break;
 			}
 
 			nameCollisions.push(collisionRouter);
 		}
-		EmbedRouter.usedIdentifiers.set(char, this as EmbedRouter<unknown>);
+		EmbedRouter.#usedIdentifiers.set(char, this as EmbedRouter<unknown>);
 
-		if (nameCollisions.length > 0 && this.name.length > 0) {
+		if (nameCollisions.length > 0 && this.#name.length > 0) {
 			process.emitWarning(
-				`EmbedRouter identifier collision for name "${this.name}" with ${nameCollisions.map((c) => `"${c.name}"`).join(", ")}`,
+				`EmbedRouter identifier collision for name "${this.#name}" with ${nameCollisions.map((c) => `"${c.#name}"`).join(", ")}`,
 				"EmbedRouterWarning",
 			);
 		}
-		this.identifier = char;
+		this.#identifier = char;
 	}
 
 	/**
@@ -100,7 +100,7 @@ export class EmbedRouter<L> {
 		routePath: P | P[],
 		handler: RouteHandler<L, ExtractParams<P>>,
 	) {
-		this.routes.push({
+		this.#routes.push({
 			path: Array.isArray(routePath) ? routePath : [routePath],
 			matchFunction: match(routePath),
 			handler: handler as RouteHandler<L>,
@@ -115,7 +115,7 @@ export class EmbedRouter<L> {
 	 */
 	public use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter<L>) {
 		const pathString = pathToString(routePath);
-		for (const route of embedRouter.routes) {
+		for (const route of embedRouter.#routes) {
 			this.get(
 				route.path.map((p) => path.posix.join(pathString, pathToString(p))),
 				route.handler,
@@ -156,7 +156,7 @@ export class EmbedRouter<L> {
 			throw new Error("Autocomplete Interactions aren't supported");
 
 		// don't check validity because url params are considered invalid
-		const resolvedRoute = this.resolve(pathToString(path, false));
+		const resolvedRoute = this.#resolve(pathToString(path, false));
 		if (!resolvedRoute)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
@@ -185,11 +185,11 @@ export class EmbedRouter<L> {
 		}
 	}
 
-	private resolve<P extends string>(
+	#resolve<P extends string>(
 		routePath: P,
 	): ResolvedRoute<L, ExtractParams<P>> | false {
 		const url = new URL(routePath, BASE_URL);
-		for (const route of this.routes) {
+		for (const route of this.#routes) {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
 				return {

@@ -14,7 +14,7 @@ export class RouteStringSelectMenuBuilder<
 	L,
 	P extends Path,
 > extends StringSelectMenuBuilder {
-	private embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<L>;
 
 	/**
 	 *
@@ -31,11 +31,11 @@ export class RouteStringSelectMenuBuilder<
 	) {
 		super(data);
 
-		this.embedRouter = embedRouter;
+		this.#embedRouter = embedRouter;
 
 		super.setCustomId(
 			encodePath(
-				this.embedRouter.getIdPrefix(),
+				this.#embedRouter.getIdPrefix(),
 				path,
 				new URLSearchParams(query),
 			),

@@ -11,7 +11,7 @@ export class RouteRoleSelectMenuBuilder<
 	L,
 	P extends Path,
 > extends RoleSelectMenuBuilder {
-	private embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<L>;
 
 	/**
 	 *
@@ -28,9 +28,9 @@ export class RouteRoleSelectMenuBuilder<
 	) {
 		super(data);
 
-		this.embedRouter = embedRouter;
+		this.#embedRouter = embedRouter;
 
-		super.setCustomId(encodePath(this.embedRouter.getIdPrefix(), path, query));
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
 	}
 
 	/**

@@ -4,7 +4,7 @@ import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
 
 export class RouteButtonBuilder<L> extends ButtonBuilder {
-	private embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<L>;
 
 	/**
 	 *
@@ -17,7 +17,7 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	) {
 		super(data);
 
-		this.embedRouter = embedRouter;
+		this.#embedRouter = embedRouter;
 	}
 
 	/**
@@ -50,7 +50,7 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {
-		super.setCustomId(encodePath(this.embedRouter.getIdPrefix(), path, query));
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
 
 		return this;
 	}

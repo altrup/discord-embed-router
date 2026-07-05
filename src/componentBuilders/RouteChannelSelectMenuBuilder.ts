@@ -11,7 +11,7 @@ export class RouteChannelSelectMenuBuilder<
 	L,
 	P extends Path,
 > extends ChannelSelectMenuBuilder {
-	private embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<L>;
 
 	/**
 	 *
@@ -28,9 +28,9 @@ export class RouteChannelSelectMenuBuilder<
 	) {
 		super(data);
 
-		this.embedRouter = embedRouter;
+		this.#embedRouter = embedRouter;
 
-		super.setCustomId(encodePath(this.embedRouter.getIdPrefix(), path, query));
+		super.setCustomId(encodePath(this.#embedRouter.getIdPrefix(), path, query));
 	}
 
 	/**
