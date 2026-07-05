@@ -44,8 +44,8 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	/**
 	 * Sets the path to route to when clicked
 	 *
-	 * @param path the path to route to
-	 * @param query any query parameters you want to add
+	 * @param path the path to route to, can include :ts
+	 * @param query any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
 	public setTo<P extends Path>(

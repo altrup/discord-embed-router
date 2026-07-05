@@ -41,8 +41,8 @@ export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, :roleId in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :roleId will be replaced with the selected user's id
+	 * @param path the path to redirect to, can include :ts :roleId
+	 * @param query any query parameters you want to add, can include :ts :roleId
 	 * @param method method to send to route
 	 */
 	public setPattern<P extends Path>(

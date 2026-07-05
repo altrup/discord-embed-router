@@ -42,8 +42,8 @@ export class RouteChannelSelectMenuBuilder<L> extends ChannelSelectMenuBuilder {
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, :channelId in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :channelId will be replaced with the selected user's id
+	 * @param path the path to redirect to, can include :ts :channelId
+	 * @param query any query parameters you want to add, can include :ts :channelId
 	 * @param method method to send to route
 	 */
 	public setPattern<P extends Path>(

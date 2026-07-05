@@ -6,7 +6,7 @@ import {
 	StringSelectMenuComponentData,
 } from "discord.js";
 import { Path } from "path-to-regexp";
-import { RouteStringSelectMenuOptionBuilder } from "./RouteStringMenuOptionBuilder";
+import { RouteStringSelectMenuOptionBuilder } from "./RouteStringSelectMenuOptionBuilder";
 import { EmbedRouter } from "../EmbedRouter";
 import { encodePath } from "../helpers/encodePath";
 import { RouteOptions } from "../types/componentBuilders";
@@ -123,8 +123,8 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 * @param path the path to redirect to, can include :ts :to *to
+	 * @param query any query parameters you want to add, can include :ts :to *to
 	 * @param method method to send to route
 	 */
 	public setPattern<P extends Path>(

@@ -41,8 +41,8 @@ export class RouteUserSelectMenuBuilder<L> extends UserSelectMenuBuilder {
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, :userId in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :userId will be replaced with the selected user's id
+	 * @param path the path to redirect to, can include :ts :userId
+	 * @param query any query parameters you want to add, can include :ts :userId
 	 * @param method method to send to route
 	 */
 	public setPattern<P extends Path>(

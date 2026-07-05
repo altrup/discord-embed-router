@@ -21,17 +21,36 @@ export const decodePath = ({
 		if (!res) return false;
 
 		const { method, path } = res;
+		if (interaction.isStringSelectMenu()) {
+			// also fill in variables for to's
+			const toURL = fillParams(interaction.values[0]!, {
+				ts: interaction.createdTimestamp.toString(),
+			});
+			const pathURL = fillParams(path, {
+				ts: interaction.createdTimestamp.toString(),
+				to: toURL.pathname,
+			});
+			// merge query params
+			for (const [key, value] of toURL.searchParams) {
+				pathURL.searchParams.append(key, value);
+			}
+			return {
+				method,
+				path: urlToPathString(pathURL),
+			};
+		}
 		return {
 			method,
-			path: fillParams(path, {
-				[interaction.isStringSelectMenu()
-					? "to"
-					: interaction.isChannelSelectMenu()
+			path: urlToPathString(
+				fillParams(path, {
+					ts: interaction.createdTimestamp.toString(),
+					[interaction.isChannelSelectMenu()
 						? "channelId"
 						: interaction.isRoleSelectMenu()
 							? "roleId"
 							: "userId"]: interaction.values[0]!.split("/").slice(1),
-			}),
+				}),
+			),
 		};
 	}
 
@@ -57,7 +76,7 @@ export const parseMethodAndPath = (
 const fillParams = (
 	path: string,
 	params: Partial<Record<string, string | string[]>> = {},
-): string => {
+): URL => {
 	const url = new URL(path, BASE_URL);
 	const toPath = compile(url.pathname);
 
@@ -75,5 +94,9 @@ const fillParams = (
 			}
 		}
 	}
+	return url;
+};
+
+const urlToPathString = (url: URL): string => {
 	return `${url.pathname}${url.search}`;
 };
