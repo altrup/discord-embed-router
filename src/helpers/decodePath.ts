@@ -28,7 +28,7 @@ export const decodePath = ({
 			});
 			const pathURL = fillParams(path, {
 				ts: interaction.createdTimestamp.toString(),
-				to: toURL.pathname,
+				to: toURL.pathname.split("/").slice(1),
 			});
 			// merge query params
 			for (const [key, value] of toURL.searchParams) {
