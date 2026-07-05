@@ -39,13 +39,13 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	}
 
 	/**
-	 * Not supported for RouteButtonBuilder (use setTo)
+	 * Not supported for RouteStringSelectMenuOptionBuilder (use setTo)
 	 *
 	 * @remarks
 	 * @param
 	 */
 	override setValue(): this {
-		throw new Error("setValue is not supported on RouteButtonBuilder");
+		throw new Error("setValue is not supported on RouteStringSelectMenuOptionBuilder");
 	}
 
 	/**

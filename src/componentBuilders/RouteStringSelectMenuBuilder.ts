@@ -26,13 +26,23 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	}
 
 	/**
-	 * Not supported for RouteButtonBuilder (use addTos)
+	 * Not supported for RouteStringSelectMenuBuilder (customId set from embedRouter)
+	 *
+	 * @remarks
+	 * @param
+	 */
+	override setCustomId(): this {
+		throw new Error("setCustomId is not supported on RouteStringSelectMenuBuilder");
+	}
+
+	/**
+	 * Not supported for RouteStringSelectMenuBuilder (use addTos)
 	 *
 	 * @remarks
 	 * @param
 	 */
 	override addOptions(): this {
-		throw new Error("setCustomId is not supported on RouteButtonBuilder");
+		throw new Error("setCustomId is not supported on RouteStringSelectMenuBuilder");
 	}
 
 	/**
