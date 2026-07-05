@@ -1,12 +1,5 @@
 import path from "node:path";
-import {
-	match,
-	ParamData,
-	parse,
-	Path,
-	stringify,
-	TokenData,
-} from "path-to-regexp";
+import { match, ParamData, Path } from "path-to-regexp";
 import {
 	CompiledRoute,
 	ResolvedRoute,
@@ -14,15 +7,55 @@ import {
 	State,
 } from "./types/routes";
 import { ExtractParams } from "./types/ExtractParams";
-import { Interaction, InteractionReplyOptions } from "discord.js";
+import {
+	ButtonInteraction,
+	Interaction,
+	InteractionReplyOptions,
+} from "discord.js";
+import { BASE_URL, ID_PREFIX } from "./consts";
+import { pathToString } from "./helpers/pathToString";
 
-export default class EmbedRouter {
-	// single path -> RouteHandler
+export class EmbedRouter {
+	private static usedIdentifiers = new Set<string>();
+	private static generateUniqueIdentifier(): string {
+		const PUA_START = 0xe000;
+		const PUA_END = 0xf8ff;
+		let char: string;
+		do {
+			const codepoint =
+				PUA_START + Math.floor(Math.random() * (PUA_END - PUA_START + 1));
+			char = String.fromCodePoint(codepoint);
+		} while (EmbedRouter.usedIdentifiers.has(char));
+		EmbedRouter.usedIdentifiers.add(char);
+		return char;
+	}
+
+	// Prefix for customIds of RouteButtonBuilders
+	private idPrefix;
+	getIdPrefix() {
+		return this.idPrefix;
+	}
+
+	// All added routes
 	private routes: CompiledRoute<ParamData>[] = [];
 
-	constructor() {}
+	/**
+	 *
+	 * @param idPrefix the prefix for RouteButtonBuilder customIds
+	 */
+	constructor(idPrefix = ID_PREFIX) {
+		if (idPrefix.includes("/")) {
+			throw new Error(`Prefix can't contain "/": ${idPrefix}`);
+		}
+		this.idPrefix = `${idPrefix}${EmbedRouter.generateUniqueIdentifier()}`;
+	}
 
-	// main command for registering paths
+	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that generates the message when a path is matched
+	 */
 	on<P extends Path = Path>(
 		routePath: P | P[],
 		handler: RouteHandler<ExtractParams<P>>,
@@ -34,34 +67,56 @@ export default class EmbedRouter {
 		});
 	}
 
-	// command for adding a subrouter
-	use<P extends Path = Path>(routePath: P, router: EmbedRouter) {
-		const pathString = this.pathToString(routePath);
-		for (const route of router.routes) {
+	/**
+	 * Adds a subrouter to the router
+	 *
+	 * @param routePath path of the router
+	 * @param embedRouter router to add at the path
+	 */
+	use<P extends Path = Path>(routePath: P, embedRouter: EmbedRouter) {
+		const pathString = pathToString(routePath);
+		for (const route of embedRouter.routes) {
 			this.on(
-				route.path.map((p) =>
-					path.posix.join(pathString, this.pathToString(p)),
-				),
+				route.path.map((p) => path.posix.join(pathString, pathToString(p))),
 				route.handler,
 			);
 		}
 	}
 
-	// command for using router
+	/**
+	 * Must be attached to "interactionCreate" event for RouteButtonBuilder to work
+	 *
+	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
+	 */
+	async listener(interaction: ButtonInteraction) {
+		if (!interaction.isButton()) return;
+
+		const customId = interaction.customId;
+		if (!customId.startsWith(this.idPrefix)) return;
+
+		const path = customId.slice(this.idPrefix.length);
+		this.dispatch(interaction, path);
+	}
+
+	/**
+	 * Connect or update an interaction message to a path
+	 *
+	 * @param interaction interaction to connect to
+	 * @param path path to route the interaction to
+	 * @param flags optional discord flags to send with message (only allowed on first reply)
+	 */
 	async dispatch<P extends Path = Path>(
 		interaction: Interaction,
-		initialPath: P,
+		path: P,
 		flags?: InteractionReplyOptions["flags"],
 	) {
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
 
 		// don't check validity because url params are considered invalid
-		const resolvedRoute = this.resolve(this.pathToString(initialPath, false));
+		const resolvedRoute = this.resolve(pathToString(path, false));
 		if (!resolvedRoute)
-			throw new Error(
-				`No route found for ${this.pathToString(initialPath, false)}`,
-			);
+			throw new Error(`No route found for ${pathToString(path, false)}`);
 
 		const routeResponse = resolvedRoute.handler(
 			interaction,
@@ -91,7 +146,7 @@ export default class EmbedRouter {
 	private resolve<P extends string>(
 		routePath: P,
 	): ResolvedRoute<ExtractParams<P>> | null {
-		const url = new URL(routePath, "x://x");
+		const url = new URL(routePath, BASE_URL);
 		for (const route of this.routes) {
 			const result = route.matchFunction(url.pathname);
 			if (result) {
@@ -105,12 +160,5 @@ export default class EmbedRouter {
 			}
 		}
 		return null;
-	}
-
-	private pathToString<P extends Path>(path: P, checkValidity = true): string {
-		if (checkValidity) {
-			return stringify(path instanceof TokenData ? path : parse(path));
-		}
-		return typeof path === "string" ? path : stringify(path);
 	}
 }
