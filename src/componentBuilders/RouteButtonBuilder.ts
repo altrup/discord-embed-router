@@ -52,8 +52,7 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	): this {
 		const idPrefix = this.embedRouter.getIdPrefix();
 
-		// don't check validity because url params are considered invalid
-		const url = new URL(pathToString(path, false), BASE_URL);
+		const url = new URL(pathToString(path), BASE_URL);
 		if (query) {
 			for (const [key, value] of new URLSearchParams(query)) {
 				url.searchParams.set(key, value);

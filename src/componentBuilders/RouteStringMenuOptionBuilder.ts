@@ -13,8 +13,7 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	) {
-		// don't check validity because url params are considered invalid
-		const url = new URL(pathToString(path, false), BASE_URL);
+		const url = new URL(pathToString(path), BASE_URL);
 		if (query) {
 			for (const [key, value] of new URLSearchParams(query)) {
 				url.searchParams.set(key, value);
@@ -45,7 +44,9 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 * @param
 	 */
 	override setValue(): this {
-		throw new Error("setValue is not supported on RouteStringSelectMenuOptionBuilder");
+		throw new Error(
+			"setValue is not supported on RouteStringSelectMenuOptionBuilder",
+		);
 	}
 
 	/**
@@ -54,7 +55,7 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 * @param path the path to route to
 	 * @param query any query parameters you want to add
 	 */
-	public setTo<P extends Path>(
+	setTo<P extends Path>(
 		path: P,
 		query?: ConstructorParameters<typeof URLSearchParams>[0],
 	): this {

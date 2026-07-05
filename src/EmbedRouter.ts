@@ -1,6 +1,6 @@
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { match, Path } from "path-to-regexp";
+import { compile, match, Path } from "path-to-regexp";
 import type {
 	CompiledRoute,
 	ResolvedRoute,
@@ -138,6 +138,11 @@ export class EmbedRouter<L> {
 			this.dispatch(interaction, path, locals);
 		} else if (interaction.isStringSelectMenu()) {
 			const path = interaction.values[0] ?? "";
+			this.dispatch(interaction, path, locals);
+		} else if (interaction.isUserSelectMenu()) {
+			const userId = interaction.values[0] ?? "";
+			const toPath = compile(customId.slice(this.getIdPrefix().length));
+			const path = toPath({ userId });
 			this.dispatch(interaction, path, locals);
 		}
 	}
