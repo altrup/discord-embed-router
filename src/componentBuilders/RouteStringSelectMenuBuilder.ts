@@ -32,7 +32,9 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error("setCustomId is not supported on RouteStringSelectMenuBuilder");
+		throw new Error(
+			"setCustomId is not supported on RouteStringSelectMenuBuilder",
+		);
 	}
 
 	/**
@@ -42,7 +44,21 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 * @param
 	 */
 	override addOptions(): this {
-		throw new Error("setCustomId is not supported on RouteStringSelectMenuBuilder");
+		throw new Error(
+			"addOptions is not supported on RouteStringSelectMenuBuilder",
+		);
+	}
+
+	/**
+	 * Not supported for RouteStringSelectMenuBuilder (use setTos)
+	 *
+	 * @remarks
+	 * @param
+	 */
+	override setOptions(): this {
+		throw new Error(
+			"setOptions is not supported on RouteStringSelectMenuBuilder",
+		);
 	}
 
 	/**
@@ -58,6 +74,28 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	): this {
 		const resolved = normalizeArray(tos);
 		super.addOptions(
+			resolved.map((o) =>
+				o instanceof RouteStringSelectMenuOptionBuilder
+					? o
+					: new RouteStringSelectMenuOptionBuilder(o),
+			),
+		);
+		return this;
+	}
+
+	/**
+	 * Sets route select menu options to builder
+	 *
+	 * @param tos the list of route select menu options
+	 */
+	public setTos(
+		...tos: RestOrArray<
+			| RouteStringSelectMenuOptionBuilder
+			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
+		>
+	): this {
+		const resolved = normalizeArray(tos);
+		super.setOptions(
 			resolved.map((o) =>
 				o instanceof RouteStringSelectMenuOptionBuilder
 					? o
