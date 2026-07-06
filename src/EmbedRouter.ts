@@ -222,6 +222,8 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 		locals?: L | undefined,
 	) {
 		try {
+			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
+
 			if (interaction.isAutocomplete())
 				throw new Error("Autocomplete Interactions aren't supported");
 
