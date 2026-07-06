@@ -7,7 +7,6 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	/**
 	 * Not supported for RouteStringSelectMenuOptionBuilder (use setTo)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setValue(): this {

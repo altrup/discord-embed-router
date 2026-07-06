@@ -24,7 +24,6 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	/**
 	 * Not supported for RouteButtonBuilder
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setURL(): this {
@@ -34,7 +33,6 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	/**
 	 * Not supported for RouteButtonBuilder (use setTo)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setCustomId(): this {

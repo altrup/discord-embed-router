@@ -29,7 +29,6 @@ export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
 	/**
 	 * Not supported for RouteRoleSelectMenuBuilder (customId set from embedRouter)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setCustomId(): this {

@@ -43,7 +43,6 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	/**
 	 * Not supported for RouteStringSelectMenuBuilder (customId set from embedRouter)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setCustomId(): this {
@@ -55,7 +54,6 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	/**
 	 * Not supported for RouteStringSelectMenuBuilder (use addTos)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override addOptions(): this {
@@ -67,7 +65,6 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	/**
 	 * Not supported for RouteStringSelectMenuBuilder (use setTos)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setOptions(): this {

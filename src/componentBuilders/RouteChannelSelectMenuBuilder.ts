@@ -30,7 +30,6 @@ export class RouteChannelSelectMenuBuilder<L> extends ChannelSelectMenuBuilder {
 	/**
 	 * Not supported for RouteChannelSelectMenuBuilder (customId set from embedRouter)
 	 *
-	 * @remarks
 	 * @param
 	 */
 	override setCustomId(): this {
