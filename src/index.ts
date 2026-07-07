@@ -11,6 +11,7 @@ export type {
 	State,
 	RouteResponse,
 	RouteHandler,
+	CleanupReason,
 	CleanupHandler,
 	Method,
 	RouteOptions,

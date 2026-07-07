@@ -13,6 +13,7 @@ import type {
 	EventNames,
 	Listener,
 	RouteOptionsWithMethod,
+	CleanupReason,
 } from "./types";
 import {
 	AnySelectMenuInteraction,
@@ -329,7 +330,7 @@ export class EmbedRouter<
 			if (interaction.isAutocomplete())
 				throw new Error("Autocomplete Interactions aren't supported");
 
-			await this.#runCleanup(interaction.message.id, false);
+			await this.#runCleanup(interaction.message.id, "interaction");
 
 			const res = this.#decodeInteraction(interaction, this.idPrefix);
 			if (!res)
@@ -520,7 +521,7 @@ export class EmbedRouter<
 			cleanupFn,
 			applyFn,
 			timeout: isFinite(timeout)
-				? setTimeout(() => this.#runCleanup(messageId, true), timeout)
+				? setTimeout(() => this.#runCleanup(messageId, "timeout"), timeout)
 				: undefined,
 		});
 	}
@@ -533,14 +534,14 @@ export class EmbedRouter<
 		this.#cleanups.delete(messageId);
 	}
 
-	async #runCleanup(messageId: Snowflake, applyResult: boolean) {
+	async #runCleanup(messageId: Snowflake, reason: CleanupReason) {
 		const cleanup = this.#cleanups.get(messageId);
 		if (!cleanup) return;
 
 		try {
 			this.#removeCleanup(messageId);
-			const result = await cleanup?.cleanupFn();
-			if (applyResult && result) {
+			const result = await cleanup?.cleanupFn(reason);
+			if (result && reason === "timeout") {
 				await cleanup.applyFn(result).catch(console.error);
 			}
 		} catch (e: unknown) {

@@ -36,7 +36,10 @@ export type RouteHandler<
 ) => M extends "GET"
 	? Promise<RouteResponse> | RouteResponse
 	: Promise<RouteResponse | undefined> | RouteResponse | undefined;
-export type CleanupHandler = () =>
+export type CleanupReason = "timeout" | "interaction";
+export type CleanupHandler = (
+	reason: "timeout" | "interaction",
+) =>
 	| Promise<InteractionEditReplyOptions | undefined>
 	| InteractionEditReplyOptions
 	| undefined;
