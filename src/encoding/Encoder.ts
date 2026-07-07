@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
-import { compile, parse, Path, stringify, Token } from "path-to-regexp";
+import { parse, Path, stringify, Token } from "path-to-regexp";
 
 import { PUA_RANGE, PUA_START, PUA_SPLIT_PATTERN } from "../consts";
 import { ENCODING_TO_METHOD, METHOD_TO_ENCODING } from "./consts";
@@ -149,75 +148,6 @@ export class Encoder {
 	}
 
 	/**
-	 * Decodes an interaction that came from a componentBuilder in this package
-	 *
-	 * @param interaction the interaction from Discord.js to decode
-	 * @param idPrefix string that the encoded path was prefixed with
-	 * @returns the method and path that was encoded from the interaction
-	 */
-	public decodeInteraction(
-		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		idPrefix: string,
-	): { method: Method; path: string } | false {
-		const customId = interaction.customId;
-		if (!customId.startsWith(idPrefix)) return false;
-
-		const decodedPath = this.decodePath(interaction.customId, { idPrefix });
-		if (decodedPath === false) return false;
-
-		if (interaction.isButton()) {
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-				}).toString(),
-			};
-		} else if (interaction.isAnySelectMenu()) {
-			if (interaction.values.length === 0) return false;
-
-			if (interaction.isStringSelectMenu()) {
-				// also fill in variables for to's
-				const toRes = this.decodePath(interaction.values[0]!, {
-					idPrefix: "",
-					allowEmptyMethod: true,
-				});
-				const toLocation = toRes
-					? this.#fillParams(toRes.path, {
-							ts: interaction.createdTimestamp.toString(),
-						})
-					: undefined;
-				const pathLocation = this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-					to: toLocation?.pathname.split("/").slice(1) ?? [""],
-				});
-
-				// merge query params
-				for (const [key, value] of toLocation?.queryParams ?? []) {
-					pathLocation.queryParams.append(key, value);
-				}
-				return {
-					method: decodedPath.method,
-					path: pathLocation.toString(),
-				};
-			}
-
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-					[interaction.isChannelSelectMenu()
-						? "channelId"
-						: interaction.isRoleSelectMenu()
-							? "roleId"
-							: "userId"]: interaction.values[0]!,
-				}).toString(),
-			};
-		}
-
-		return false;
-	}
-
-	/**
 	 * Decodes a path
 	 *
 	 * @param path the encoded path
@@ -302,30 +232,6 @@ export class Encoder {
 			}
 		}
 		return decodedTokens;
-	}
-
-	#fillParams(
-		path: string,
-		params: Partial<Record<string, string | string[]>> = {},
-	): Location {
-		const location = new Location(path);
-		const toPath = compile(location.pathname);
-
-		location.pathname = toPath(params);
-		for (const [key, value] of location.queryParams) {
-			if (value.startsWith(":") && value.slice(1) in params) {
-				const paramValue = params?.[value.slice(1)];
-				if (paramValue) {
-					location.queryParams.set(
-						key,
-						Array.isArray(paramValue) ? paramValue.join("/") : paramValue,
-					);
-				} else {
-					location.queryParams.delete(key);
-				}
-			}
-		}
-		return location;
 	}
 
 	#tokensToSegments(tokens: Token[]): string[] {
