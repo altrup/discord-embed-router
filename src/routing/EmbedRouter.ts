@@ -107,7 +107,10 @@ export class EmbedRouter<
 
 			nameCollisions.push(collisionRouter);
 		}
-		EmbedRouter.#usedIdentifiers.set(char, this as EmbedRouter<object>);
+		EmbedRouter.#usedIdentifiers.set(
+			char,
+			this as unknown as EmbedRouter<object>,
+		);
 
 		if (nameCollisions.length > 0 && this.#name.length > 0) {
 			process.emitWarning(
@@ -228,135 +231,6 @@ export class EmbedRouter<
 	}
 
 	/**
-	 * Must be attached to "interactionCreate" event for RouteButtonBuilder to work
-	 *
-	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
-	 */
-	public async listener(
-		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		locals?: L | undefined,
-	) {
-		try {
-			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
-
-			if (interaction.isAutocomplete())
-				throw new Error("Autocomplete Interactions aren't supported");
-
-			await this.#runCleanup(interaction.message.id, false);
-
-			const res = this.#decodeInteraction(interaction, this.idPrefix);
-			if (!res)
-				throw new Error(`Invalid component found: id ${interaction.customId}`);
-
-			await this.dispatch(interaction, res.path, {
-				method: res.method,
-				locals,
-			});
-		} catch (e: unknown) {
-			this.emit(
-				"routeError",
-				e instanceof Error ? e : new Error(String(e)),
-				interaction,
-			);
-		}
-	}
-
-	/**
-	 * Decodes an interaction that came from a componentBuilder in this package
-	 *
-	 * @param interaction the interaction from Discord.js to decode
-	 * @param idPrefix string that the encoded path was prefixed with
-	 * @returns the method and path that was encoded from the interaction
-	 */
-	#decodeInteraction(
-		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		idPrefix: string,
-	): { method: Method; path: string } | false {
-		const customId = interaction.customId;
-		if (!customId.startsWith(idPrefix)) return false;
-
-		const decodedPath = this.#encoder.decodePath(interaction.customId, {
-			idPrefix,
-		});
-		if (decodedPath === false) return false;
-
-		if (interaction.isButton()) {
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-				}).toString(),
-			};
-		} else if (interaction.isAnySelectMenu()) {
-			if (interaction.values.length === 0) return false;
-
-			if (interaction.isStringSelectMenu()) {
-				// also fill in variables for to's
-				const toRes = this.#encoder.decodePath(interaction.values[0]!, {
-					idPrefix: "",
-					allowEmptyMethod: true,
-				});
-				const toLocation = toRes
-					? this.#fillParams(toRes.path, {
-							ts: interaction.createdTimestamp.toString(),
-						})
-					: undefined;
-				const pathLocation = this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-					to: toLocation?.pathname.split("/").slice(1) ?? [""],
-				});
-
-				// merge query params
-				for (const [key, value] of toLocation?.queryParams ?? []) {
-					pathLocation.queryParams.append(key, value);
-				}
-				return {
-					method: decodedPath.method,
-					path: pathLocation.toString(),
-				};
-			}
-
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-					[interaction.isChannelSelectMenu()
-						? "channelId"
-						: interaction.isRoleSelectMenu()
-							? "roleId"
-							: "userId"]: interaction.values[0]!,
-				}).toString(),
-			};
-		}
-
-		return false;
-	}
-
-	#fillParams(
-		path: string,
-		params: Partial<Record<string, string | string[]>> = {},
-	): Location {
-		const location = new Location(path);
-		const toPath = compile(location.pathname);
-
-		location.pathname = toPath(params);
-		for (const [key, value] of location.queryParams) {
-			if (value.startsWith(":") && value.slice(1) in params) {
-				const paramValue = params?.[value.slice(1)];
-				if (paramValue) {
-					location.queryParams.set(
-						key,
-						Array.isArray(paramValue) ? paramValue.join("/") : paramValue,
-					);
-				} else {
-					location.queryParams.delete(key);
-				}
-			}
-		}
-		return location;
-	}
-
-	/**
 	 * Replies to or editReplies to an interaction based on the route output
 	 *
 	 * @param interaction interaction to connect to
@@ -438,6 +312,162 @@ export class EmbedRouter<
 			applyFn,
 			routeResponse?.timeout,
 		);
+	}
+
+	/**
+	 * Must be attached to "interactionCreate" event for RouteButtonBuilder to work
+	 *
+	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
+	 */
+	public async listener(
+		interaction: ButtonInteraction | AnySelectMenuInteraction,
+		locals?: L | undefined,
+	) {
+		try {
+			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
+
+			if (interaction.isAutocomplete())
+				throw new Error("Autocomplete Interactions aren't supported");
+
+			await this.#runCleanup(interaction.message.id, false);
+
+			const res = this.#decodeInteraction(interaction, this.idPrefix);
+			if (!res)
+				throw new Error(`Invalid component found: id ${interaction.customId}`);
+
+			await this.dispatch(interaction, res.path, {
+				method: res.method,
+				locals,
+			});
+		} catch (e: unknown) {
+			this.emit(
+				"routeError",
+				e instanceof Error ? e : new Error(String(e)),
+				interaction,
+			);
+		}
+	}
+
+	/**
+	 * Decodes an interaction that came from a componentBuilder in this package
+	 *
+	 * @param interaction the interaction from Discord.js to decode
+	 * @param idPrefix string that the encoded path was prefixed with
+	 * @returns the method and path that was encoded from the interaction
+	 */
+	#decodeInteraction(
+		interaction: ButtonInteraction | AnySelectMenuInteraction,
+		idPrefix: string,
+	): { method: Method; path: string } | false {
+		const customId = interaction.customId;
+		if (!customId.startsWith(idPrefix)) return false;
+
+		const decodedPath = this.#encoder.decodePath(interaction.customId, {
+			idPrefix,
+		});
+		if (decodedPath === false) return false;
+
+		if (interaction.isButton()) {
+			return {
+				method: decodedPath.method,
+				path: this.#fillParams(decodedPath.path, {
+					ts: interaction.createdTimestamp.toString(),
+				}).toString(),
+			};
+		} else if (interaction.isAnySelectMenu()) {
+			if (interaction.values.length === 0) return false;
+
+			if (interaction.isStringSelectMenu()) {
+				// also fill in variables for to's
+				const toLocations = interaction.values
+					.map((v) =>
+						this.#encoder.decodePath(v, {
+							idPrefix: "",
+							allowEmptyMethod: true,
+						}),
+					)
+					.filter((r) => r !== false)
+					.map((r) =>
+						this.#fillParams(r.path, {
+							ts: interaction.createdTimestamp.toString(),
+						}),
+					);
+				const pathLocation = this.#fillParams(
+					decodedPath.path,
+					{
+						ts: interaction.createdTimestamp.toString(),
+						to: toLocations[0]?.pathname.split("/").filter((s) => s.length > 0),
+						tos: toLocations
+							.map((l) => l.pathname.split("/"))
+							.flat()
+							.filter((s) => s.length > 0),
+					},
+					{
+						ts: interaction.createdTimestamp.toString(),
+						to: toLocations[0]?.pathname,
+						tos: toLocations.map((l) => l.pathname),
+					},
+				);
+
+				// merge query params
+				for (const toLocation of toLocations) {
+					for (const [key, value] of toLocation?.queryParams ?? []) {
+						pathLocation.queryParams.append(key, value);
+					}
+				}
+				return {
+					method: decodedPath.method,
+					path: pathLocation.toString(),
+				};
+			}
+
+			return {
+				method: decodedPath.method,
+				path: this.#fillParams(decodedPath.path, {
+					ts: interaction.createdTimestamp.toString(),
+					[interaction.isChannelSelectMenu()
+						? "channelId"
+						: interaction.isRoleSelectMenu()
+							? "roleId"
+							: "userId"]: interaction.values[0],
+					[interaction.isChannelSelectMenu()
+						? "channelIds"
+						: interaction.isRoleSelectMenu()
+							? "roleIds"
+							: "userIds"]: interaction.values,
+				}).toString(),
+			};
+		}
+
+		return false;
+	}
+
+	#fillParams(
+		path: string,
+		params: Partial<Record<string, string | string[]>> = {},
+		queryParams = params,
+	): Location {
+		const location = new Location(path);
+		const toPath = compile(location.pathname);
+
+		location.pathname = toPath(params);
+		for (const [key, value] of location.queryParams) {
+			if (
+				(value.startsWith(":") || value.startsWith("*")) &&
+				value.slice(1) in queryParams
+			) {
+				const paramValue = queryParams?.[value.slice(1)];
+				if (paramValue) {
+					location.queryParams.delete(key, value);
+					if (Array.isArray(paramValue))
+						paramValue.forEach((pv) => location.queryParams.append(key, pv));
+					else location.queryParams.append(key, paramValue);
+				} else {
+					location.queryParams.delete(key);
+				}
+			}
+		}
+		return location;
 	}
 
 	/**

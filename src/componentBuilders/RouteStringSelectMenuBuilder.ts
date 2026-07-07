@@ -127,8 +127,8 @@ export class RouteStringSelectMenuBuilder<
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, can include :ts :to *to
-	 * @param query any query parameters you want to add, can include :ts :to *to
+	 * @param path the path to redirect to, can include :ts *to *tos
+	 * @param query any query parameters you want to add, can include :ts *to *tos
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {

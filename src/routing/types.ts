@@ -56,8 +56,8 @@ export type CompiledRoute<
 	handler: RouteHandler<M, L, P>;
 };
 
-export type RouteOptions<AllowEmptyMethod extends boolean = false> = {
-	method?: AllowEmptyMethod extends false ? Method : Method | "" | undefined;
+export type RouteOptions = {
+	method?: Method;
 	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 export type RouteOptionsWithMethod<AllowEmptyMethod extends boolean = false> = {

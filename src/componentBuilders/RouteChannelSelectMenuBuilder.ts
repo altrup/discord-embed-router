@@ -45,8 +45,8 @@ export class RouteChannelSelectMenuBuilder<
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, can include :ts :channelId
-	 * @param query any query parameters you want to add, can include :ts :channelId
+	 * @param path the path to redirect to, can include :ts :channelId *channelIds
+	 * @param query any query parameters you want to add, can include :ts :channelId *channelIds
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {

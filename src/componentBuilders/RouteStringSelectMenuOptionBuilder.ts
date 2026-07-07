@@ -24,7 +24,7 @@ export class RouteStringSelectMenuOptionBuilder<
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;
-			toOptions?: RouteOptions<true> | undefined;
+			toOptions?: Omit<RouteOptions, "method"> | undefined;
 		},
 	) {
 		const { to, toOptions, label, ...rest } = data ?? {};
@@ -51,11 +51,11 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * @param query any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
-	public setTo(path: P, { method = "", query }: RouteOptions<true> = {}): this {
+	public setTo(path: P, { query }: Omit<RouteOptions, "method"> = {}): this {
 		super.setValue(
 			this.#embedRouter.encodePath<true>(path, {
 				idPrefix: "",
-				method,
+				method: "",
 				query,
 			}),
 		);
