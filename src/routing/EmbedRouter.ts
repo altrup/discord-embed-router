@@ -14,10 +14,14 @@ import type {
 	Listener,
 	RouteOptionsWithMethod,
 	CleanupReason,
+	SessionProvider,
+	LocalsProvider,
+	CleanupHandler,
 } from "./types";
 import {
 	AnySelectMenuInteraction,
 	ButtonInteraction,
+	Client,
 	Interaction,
 	InteractionReplyOptions,
 	MessageFlags,
@@ -33,10 +37,15 @@ type EmbedRouterEvents = {
 };
 
 export class EmbedRouter<
-	L extends object,
+	Globals = unknown,
+	Session = unknown,
+	Locals = unknown,
 > extends EventEmitter<EmbedRouterEvents> {
 	// identifier -> embedRouter
-	static #usedIdentifiers = new Map<string, EmbedRouter<object>>();
+	static #usedIdentifiers = new Map<
+		string,
+		EmbedRouter<object, object, object>
+	>();
 
 	// Name used to generate prefixes
 	#name = "";
@@ -48,31 +57,79 @@ export class EmbedRouter<
 	}
 
 	// All added routes
-	#routes: Map<Method, CompiledRoute<Method, L>[]> = new Map();
+	#routes: Map<Method, CompiledRoute<Method, Globals, Session, Locals>[]> =
+		new Map();
 	// message.id -> cleanup object
 	#cleanups: Map<
 		Snowflake,
 		{
-			timeout?: NodeJS.Timeout | undefined;
-			cleanupFn: NonNullable<RouteResponse["cleanup"]>;
-			applyFn: ApplyHandler;
+			timeout: NodeJS.Timeout;
+			cleanupFn: CleanupHandler | undefined;
+			applyFn: ApplyHandler | undefined;
 		}
 	> = new Map();
 
+	// Encoder for paths
 	#encoder: Encoder = new Encoder();
+
+	// Persistant storage
+	#globals: Globals | undefined;
+	#sessions: Map<Snowflake, Session> = new Map();
+	#sessionProvider: undefined | SessionProvider<Globals, Session, Locals>;
+	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
+
+	/**
+	 * registers a session provider with this router
+	 *
+	 * @param sessionProvider the session provider to set
+	 */
+	public setSessionProvider(
+		sessionProvider: SessionProvider<Globals, Session, Locals>,
+	) {
+		this.#sessionProvider = sessionProvider;
+	}
+	/**
+	 * deletes the session provider on this router
+	 */
+	public deleteSessionProvider() {
+		this.#sessionProvider = undefined;
+	}
+
+	/**
+	 * registers a locals provider with this router
+	 *
+	 * @param localsProvider the locals provider to set
+	 */
+	public setLocalsProvider(
+		localsProvider: LocalsProvider<Globals, Session, Locals>,
+	) {
+		this.#localsProvider = localsProvider;
+	}
+	/**
+	 * deletes the locals provider on this router
+	 */
+	public deleteLocalsProvider() {
+		this.#localsProvider = undefined;
+	}
 
 	/**
 	 *
+	 * @param client the client from discord.js to connect to
 	 * @param name the name to give the router. ensures buttons stay connected across restarts
 	 * @param idPrefix the prefix for customIds
 	 */
-	constructor({
-		name = "",
-		idPrefix = ID_PREFIX,
-	}: {
-		name?: string | undefined;
-		idPrefix?: string | undefined;
-	} = {}) {
+	constructor(
+		client: Client,
+		{
+			name = "",
+			idPrefix = ID_PREFIX,
+			globals,
+		}: {
+			name?: string | undefined;
+			idPrefix?: string | undefined;
+			globals?: Globals | undefined;
+		} = {},
+	) {
 		super();
 
 		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
@@ -81,9 +138,15 @@ export class EmbedRouter<
 		if (idPrefix.includes("/")) {
 			throw new Error(`Prefix can't contain "/": ${idPrefix}`);
 		}
-		this.#idPrefix = idPrefix;
+
 		this.#name = name;
+		this.#idPrefix = idPrefix;
+		this.#globals = globals;
 		this.#updateIdentifier();
+
+		client.on("interactionCreate", (interaction) =>
+			this.#listener(interaction),
+		);
 	}
 
 	#updateIdentifier() {
@@ -110,7 +173,7 @@ export class EmbedRouter<
 		}
 		EmbedRouter.#usedIdentifiers.set(
 			char,
-			this as unknown as EmbedRouter<object>,
+			this as unknown as EmbedRouter<object, object, object>,
 		);
 
 		if (nameCollisions.length > 0 && this.#name.length > 0) {
@@ -125,14 +188,14 @@ export class EmbedRouter<
 	#addRoute<M extends Method, P extends Path = Path>(
 		method: M,
 		routePath: P | P[],
-		handler: RouteHandler<M, L, ExtractParams<P>>,
+		handler: RouteHandler<M, Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		const methodRoutes = this.#routes.get(method) ?? [];
 		methodRoutes.push({
 			method,
 			path: Array.isArray(routePath) ? routePath : [routePath],
 			matchFunction: match(routePath),
-			handler: handler as RouteHandler<M, L>,
+			handler: handler as RouteHandler<M, Globals, Session, Locals>,
 		});
 		this.#routes.set(method, methodRoutes);
 
@@ -152,7 +215,7 @@ export class EmbedRouter<
 	 */
 	public get<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<"GET", L, ExtractParams<P>>,
+		handler: RouteHandler<"GET", Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		this.#addRoute("GET", routePath, handler);
 	}
@@ -165,7 +228,7 @@ export class EmbedRouter<
 	 */
 	public post<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<"POST", L, ExtractParams<P>>,
+		handler: RouteHandler<"POST", Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		this.#addRoute("POST", routePath, handler);
 	}
@@ -178,7 +241,7 @@ export class EmbedRouter<
 	 */
 	public put<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<"PUT", L, ExtractParams<P>>,
+		handler: RouteHandler<"PUT", Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		this.#addRoute("PUT", routePath, handler);
 	}
@@ -191,7 +254,7 @@ export class EmbedRouter<
 	 */
 	public patch<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<"PATCH", L, ExtractParams<P>>,
+		handler: RouteHandler<"PATCH", Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		this.#addRoute("PATCH", routePath, handler);
 	}
@@ -204,7 +267,7 @@ export class EmbedRouter<
 	 */
 	public delete<P extends Path = Path>(
 		routePath: P | P[],
-		handler: RouteHandler<"DELETE", L, ExtractParams<P>>,
+		handler: RouteHandler<"DELETE", Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		this.#addRoute("DELETE", routePath, handler);
 	}
@@ -217,7 +280,11 @@ export class EmbedRouter<
 	 */
 	public use<P extends Path = Path>(
 		routePath: P,
-		embedRouter: EmbedRouter<Partial<L>>,
+		embedRouter: EmbedRouter<
+			Partial<Globals>,
+			Partial<Session>,
+			Partial<Locals>
+		>,
 	) {
 		const pathString = pathToString(routePath);
 		for (const [method, routes] of embedRouter.#routes) {
@@ -225,7 +292,12 @@ export class EmbedRouter<
 				this.#addRoute(
 					method,
 					route.path.map((p) => path.posix.join(pathString, pathToString(p))),
-					route.handler,
+					route.handler as unknown as RouteHandler<
+						Method,
+						Globals,
+						Session,
+						Locals
+					>,
 				);
 			}
 		}
@@ -246,21 +318,29 @@ export class EmbedRouter<
 		{
 			method = "GET",
 			flags,
-			locals,
+			locals = this.#localsProvider?.(this, interaction),
 		}: {
 			method?: Method;
 			flags?: InteractionReplyOptions["flags"] | undefined;
-			locals?: L | undefined;
+			locals?: Locals | undefined;
 		} = {},
 	) {
-		if (interaction.isAutocomplete())
-			throw new Error("Autocomplete Interactions aren't supported");
+		if (!this.isSupportedInteraction(interaction))
+			throw new Error(
+				`Interactions type is not supported: ${interaction.type}`,
+			);
 
+		const session =
+			("message" in interaction
+				? this.#sessions.get(interaction.message.id)
+				: undefined) ?? this.#sessionProvider?.(this, interaction);
 		const routeResponse = await this.#resolve(path, {
 			interaction,
 			method,
+			session,
 			locals,
 		});
+		if (routeResponse === undefined) return;
 		if (routeResponse === false)
 			throw new Error(`No route found for ${pathToString(path, false)}`);
 
@@ -289,10 +369,12 @@ export class EmbedRouter<
 			});
 		}
 
-		// Apply cleanup if needed
-		if (!routeResponse?.cleanup) return;
+		// Apply session and cleanup if needed
+		if (!session && !routeResponse.cleanup) return;
 
 		const message = await interaction.fetchReply();
+		if (session) this.#sessions.set(message.id, session);
+
 		const channel = interaction.channel;
 		const applyFn: ApplyHandler | undefined = message.flags.has(
 			MessageFlags.Ephemeral,
@@ -302,33 +384,32 @@ export class EmbedRouter<
 				? (options) => channel.messages.edit(message.id, options)
 				: undefined;
 		if (!applyFn)
-			return process.emitWarning(
+			process.emitWarning(
 				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return results will not be applied to message.`,
 				"DiscordEmbedRouterWarning",
 			);
 
 		this.#addCleanup(
 			message.id,
-			routeResponse.cleanup.bind(routeResponse),
+			routeResponse.cleanup?.bind(routeResponse),
 			applyFn,
-			routeResponse?.timeout,
+			routeResponse.timeout,
 		);
 	}
 
 	/**
-	 * Must be attached to "interactionCreate" event for RouteButtonBuilder to work
+	 * Attached to "interactionCreate" event to detect our custom RouteComponents
 	 *
 	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
 	 */
-	public async listener(
-		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		locals?: L | undefined,
-	) {
+	async #listener(interaction: Interaction) {
 		try {
+			if (
+				!this.isSupportedInteraction(interaction) ||
+				interaction.isChatInputCommand()
+			)
+				return;
 			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
-
-			if (interaction.isAutocomplete())
-				throw new Error("Autocomplete Interactions aren't supported");
 
 			await this.#runCleanup(interaction.message.id, "interaction");
 
@@ -338,7 +419,7 @@ export class EmbedRouter<
 
 			await this.dispatch(interaction, res.path, {
 				method: res.method,
-				locals,
+				locals: this.#localsProvider?.(this, interaction),
 			});
 		} catch (e: unknown) {
 			this.emit(
@@ -347,6 +428,20 @@ export class EmbedRouter<
 				interaction,
 			);
 		}
+	}
+
+	/**
+	 * Returns if an interaction is a supported type
+	 *
+	 * @param interaction the interaction to check
+	 * @returns if interaction is a supported type
+	 */
+	public isSupportedInteraction(interaction: Interaction) {
+		return (
+			interaction.isAnySelectMenu() ||
+			interaction.isButton() ||
+			interaction.isChatInputCommand()
+		);
 	}
 
 	/**
@@ -480,28 +575,31 @@ export class EmbedRouter<
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 * @returns discord message associated with route OR false
 	 */
-	async #resolve<P extends Path>(
+	async #resolve<P extends Path = Path>(
 		path: P,
 		{
 			interaction,
 			method = "GET",
+			session,
 			locals,
 		}: {
 			interaction: Interaction;
 			method?: Method;
-			locals?: L | undefined;
+			session: Session | undefined;
+			locals: Locals | undefined;
 		},
-	): Promise<RouteResponse | undefined | false> {
+	): Promise<RouteResponse<Session> | undefined | false> {
 		// don't check validity because query params are considered invalid
 		const pathString = pathToString(path, false);
 		const location = new Location(pathString);
 		for (const route of this.#routes.get(method) ?? []) {
 			const result = route.matchFunction(location.pathname);
 			if (result) {
-				return await route.handler(interaction, {
+				return await route.handler(this, interaction, {
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
-					embedRouter: this,
+					globals: this.#globals,
+					session,
 					locals,
 				});
 			}
@@ -512,17 +610,23 @@ export class EmbedRouter<
 	// Helpers for using and storing cleanup functions
 	#addCleanup(
 		messageId: Snowflake,
-		cleanupFn: NonNullable<RouteResponse["cleanup"]>,
-		applyFn: ApplyHandler,
-		timeout: number,
+		cleanupFn: CleanupHandler | undefined,
+		applyFn: ApplyHandler | undefined,
+		timeout: number | undefined,
 	) {
+		if (!timeout || !isFinite(timeout))
+			throw new Error(
+				"Timeout is required for components using cleanups or sessions",
+			);
+
 		this.#removeCleanup(messageId);
 		this.#cleanups.set(messageId, {
 			cleanupFn,
 			applyFn,
-			timeout: isFinite(timeout)
-				? setTimeout(() => this.#runCleanup(messageId, "timeout"), timeout)
-				: undefined,
+			timeout: setTimeout(
+				() => this.#runCleanup(messageId, "timeout"),
+				timeout,
+			),
 		});
 	}
 
@@ -540,9 +644,12 @@ export class EmbedRouter<
 
 		try {
 			this.#removeCleanup(messageId);
-			const result = await cleanup?.cleanupFn(reason);
+			if (reason === "timeout") {
+				this.#sessions.delete(messageId);
+			}
+			const result = await cleanup?.cleanupFn?.(reason);
 			if (result && reason === "timeout") {
-				await cleanup.applyFn(result).catch(console.error);
+				await cleanup.applyFn?.(result).catch(console.error);
 			}
 		} catch (e: unknown) {
 			this.emit(

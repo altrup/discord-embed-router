@@ -11,16 +11,21 @@ import type { EmbedRouter } from "../routing/EmbedRouter";
 // EmbedRouter
 
 export type State<
-	L extends object,
+	Globals,
+	Session,
+	Locals,
 	P extends ParamData = ParamData,
 > = MatchResult<P> & {
-	embedRouter: EmbedRouter<L>;
-	locals?: L | undefined;
+	globals?: Globals | undefined;
+	session?: Session | undefined;
+	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
 };
-export type RouteResponse = InteractionEditReplyOptions &
+export type RouteResponse<Session> = InteractionEditReplyOptions &
 	(
-		| { cleanup?: undefined; timeout?: undefined }
+		| ({ cleanup?: undefined } & (unknown extends Session
+				? { timeout?: number }
+				: { timeout: number }))
 		| {
 				cleanup: CleanupHandler;
 				timeout: number;
@@ -28,14 +33,19 @@ export type RouteResponse = InteractionEditReplyOptions &
 	);
 export type RouteHandler<
 	M extends Method,
-	L extends object,
+	Globals,
+	Session,
+	Locals,
 	P extends ParamData = ParamData,
 > = (
+	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,
-	state: State<L, P>,
+	state: State<Globals, Session, Locals, P>,
 ) => M extends "GET"
-	? Promise<RouteResponse> | RouteResponse
-	: Promise<RouteResponse | undefined> | RouteResponse | undefined;
+	? Promise<RouteResponse<Session>> | RouteResponse<Session>
+	: | Promise<RouteResponse<Session> | undefined>
+		| RouteResponse<Session>
+		| undefined;
 export type CleanupReason = "timeout" | "interaction";
 export type CleanupHandler = (
 	reason: "timeout" | "interaction",
@@ -46,17 +56,27 @@ export type CleanupHandler = (
 export type ApplyHandler = (
 	options: string | InteractionEditReplyOptions,
 ) => Promise<unknown>;
+export type SessionProvider<Globals, Session, Locals> = (
+	embedRouter: EmbedRouter<Globals, Session, Locals>,
+	interaction: Interaction,
+) => Session;
+export type LocalsProvider<Globals, Session, Locals> = (
+	embedRouter: EmbedRouter<Globals, Session, Locals>,
+	interaction: Interaction,
+) => Locals;
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type CompiledRoute<
 	M extends Method,
-	L extends object,
+	Globals,
+	Session,
+	Locals,
 	P extends ParamData = ParamData,
 > = {
 	method: Method;
 	path: Path[];
 	matchFunction: MatchFunction<P>;
-	handler: RouteHandler<M, L, P>;
+	handler: RouteHandler<M, Globals, Session, Locals, P>;
 };
 
 export type RouteOptions = {

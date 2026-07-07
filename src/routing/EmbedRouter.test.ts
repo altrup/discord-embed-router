@@ -80,10 +80,10 @@ test("Router only listens for interactions with its prefix", async () => {
 
 	embedRouter.delete("/test/:id", handler);
 
-	await embedRouter.listener(noPrefixButtonInteraction);
+	await embedRouter.#listener(noPrefixButtonInteraction);
 	expect(handler).not.toHaveBeenCalled();
 
-	await embedRouter.listener(prefixButtonInteraction);
+	await embedRouter.#listener(prefixButtonInteraction);
 	expect(handler).toHaveBeenCalledOnce();
 
 	const [, data] = handler.mock.calls[0]!;
