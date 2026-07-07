@@ -11,7 +11,7 @@ export const counter: RouteHandler<"GET", Locals> = (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {
-	const counterValue = parseInt(state.query.get("value") ?? "0");
+	const counterValue = parseInt(state.queryParams.get("value") ?? "0");
 
 	return {
 		embeds: [

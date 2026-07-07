@@ -16,7 +16,7 @@ export type State<
 > = MatchResult<P> & {
 	embedRouter: EmbedRouter<L>;
 	locals?: L | undefined;
-	query: URLSearchParams;
+	queryParams: URLSearchParams;
 };
 export type RouteResponse = InteractionEditReplyOptions &
 	(

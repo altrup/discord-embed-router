@@ -374,7 +374,7 @@ export class EmbedRouter<
 			if (result) {
 				return await route.handler(interaction, {
 					...(result as MatchResult<ExtractParams<P>>),
-					query: location.queryParams,
+					queryParams: location.queryParams,
 					embedRouter: this,
 					locals,
 				});

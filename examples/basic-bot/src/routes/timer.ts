@@ -11,8 +11,8 @@ export const timer: RouteHandler<"GET", Locals> = (
 	interaction: Interaction,
 	state: State<Locals>,
 ) => {
-	const startTime = parseInt(state.query.get("startTime") ?? "");
-	const dur = parseInt(state.query.get("dur") ?? "");
+	const startTime = parseInt(state.queryParams.get("startTime") ?? "");
+	const dur = parseInt(state.queryParams.get("dur") ?? "");
 	const endTime = startTime + dur;
 
 	const timeout = !isNaN(endTime)

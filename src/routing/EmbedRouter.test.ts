@@ -64,7 +64,7 @@ test("Router dispatch calls route handler with data", async () => {
 
 	const [, data] = handler.mock.calls[0]!;
 	expect(data.params).toEqual({ id: "2" });
-	expect(data.query.get("test")).toEqual("3");
+	expect(data.queryParams.get("test")).toEqual("3");
 });
 
 test("Router only listens for interactions with its prefix", async () => {
