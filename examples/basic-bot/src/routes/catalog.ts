@@ -25,15 +25,15 @@ export const catalog: RouteHandler<"GET", Locals> = (
 					new RouteStringSelectMenuBuilder(state.embedRouter)
 						.setPlaceholder("Choose a page")
 						.setTos(
-							new RouteStringSelectMenuOptionBuilder()
+							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
 								.setLabel("Counter")
 								.setDescription("A simple counter page")
 								.setTo(join(state.path, "counter")),
-							new RouteStringSelectMenuOptionBuilder()
+							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
 								.setLabel("User Info")
 								.setDescription("View someone's user info")
 								.setTo(join(state.path, "user-info")),
-							new RouteStringSelectMenuOptionBuilder()
+							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
 								.setLabel("Timer")
 								.setDescription("A sample timer page")
 								.setTo(join(state.path, "timer")),
