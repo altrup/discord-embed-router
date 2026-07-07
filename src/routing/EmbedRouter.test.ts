@@ -1,6 +1,9 @@
 import { vi, expect, test } from "vitest";
-import { EmbedRouter } from "./EmbedRouter";
-import { ButtonInteraction } from "discord.js";
+import EventEmitter from "node:events";
+import { ButtonInteraction, Client } from "discord.js";
+import { EmbedRouter } from "@routing/EmbedRouter";
+
+const mockClient = (): Client => new EventEmitter() as unknown as Client;
 
 const mockButtonInteraction = (
 	customId: string,
@@ -30,16 +33,21 @@ const mockButtonInteraction = (
 };
 
 test("No id collisions", () => {
-	expect(new EmbedRouter().idPrefix).not.toBe(new EmbedRouter().idPrefix);
+	const client = mockClient();
+	expect(new EmbedRouter(client).idPrefix).not.toBe(
+		new EmbedRouter(client).idPrefix,
+	);
 });
 
 test("Router warns about named collisions", () => {
+	const client = mockClient();
+
 	const warningSpy = vi
 		.spyOn(process, "emitWarning")
 		.mockImplementation(() => {});
 
-	new EmbedRouter({ name: "embed-router" });
-	new EmbedRouter({ name: "embed-router" });
+	new EmbedRouter(client, { name: "embed-router" });
+	new EmbedRouter(client, { name: "embed-router" });
 
 	expect(warningSpy).toHaveBeenCalledWith(
 		expect.stringContaining("EmbedRouter identifier collision"),
@@ -48,13 +56,15 @@ test("Router warns about named collisions", () => {
 });
 
 test("Router dispatch calls route handler with data", async () => {
-	const embedRouter = new EmbedRouter();
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
 
 	const handler = vi.fn();
 	const buttonInteraction = mockButtonInteraction("");
 
 	embedRouter.get("/test/:id", handler);
 
+	// invalid route
 	await expect(
 		embedRouter.dispatch(buttonInteraction, "/test?test=3"),
 	).rejects.toThrow();
@@ -62,13 +72,14 @@ test("Router dispatch calls route handler with data", async () => {
 	await embedRouter.dispatch(buttonInteraction, "/test/2?test=3");
 	expect(handler).toHaveBeenCalledOnce();
 
-	const [, data] = handler.mock.calls[0]!;
+	const [, , data] = handler.mock.calls[0]!;
 	expect(data.params).toEqual({ id: "2" });
 	expect(data.queryParams.get("test")).toEqual("3");
 });
 
 test("Router only listens for interactions with its prefix", async () => {
-	const embedRouter = new EmbedRouter();
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
 
 	const handler = vi.fn();
 	const noPrefixButtonInteraction = mockButtonInteraction(
@@ -80,12 +91,12 @@ test("Router only listens for interactions with its prefix", async () => {
 
 	embedRouter.delete("/test/:id", handler);
 
-	await embedRouter.#listener(noPrefixButtonInteraction);
-	expect(handler).not.toHaveBeenCalled();
+	client.emit("interactionCreate", noPrefixButtonInteraction);
+	await vi.waitFor(() => expect(handler).not.toHaveBeenCalled());
 
-	await embedRouter.#listener(prefixButtonInteraction);
-	expect(handler).toHaveBeenCalledOnce();
+	client.emit("interactionCreate", prefixButtonInteraction);
+	await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
 
-	const [, data] = handler.mock.calls[0]!;
+	const [, , data] = handler.mock.calls[0]!;
 	expect(data.params).toEqual({ id: "3" });
 });
