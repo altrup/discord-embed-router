@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
-import { compile, parse, Path, stringify, Text, Token } from "path-to-regexp";
+import { compile, parse, Path, stringify, Token } from "path-to-regexp";
 
-import { PUA_RANGE, PUA_START, BASE_URL } from "../consts";
+import { PUA_RANGE, PUA_START, PUA_SPLIT_PATTERN } from "../consts";
 import { ENCODING_TO_METHOD, METHOD_TO_ENCODING } from "./consts";
 
 import { pathToString } from "../helpers/pathToString";
 import { isMethodEncoding } from "./types";
 import { Method, RouteOptionsWithMethod } from "../routing/types";
-import { removeParams } from "../helpers/removeParams";
+import { Location } from "../helpers/Location";
 
 export class Encoder {
 	#segmentToEncoding: Map<string, string> = new Map();
@@ -22,9 +22,9 @@ export class Encoder {
 	 * @param path the path to save encodings for
 	 */
 	public registerPath<P extends Path>(path: P) {
-		// don't check validity; path may include url params
-		const pathString = removeParams(pathToString(path, false));
-		parse(pathString).tokens.forEach((t) => this.registerToken(t));
+		// don't check validity; path may include query params
+		const location = new Location(pathToString(path, false));
+		location.tokens.forEach((t) => this.registerToken(t));
 	}
 
 	/**
@@ -100,18 +100,11 @@ export class Encoder {
 			idPrefix: string;
 		},
 	) => {
-		// don't check validity; path may include url params
-		const pathString = pathToString(path, false);
-		const url = new URL(pathString, BASE_URL);
-		const encodedPath = this.#tokensToSegments(
-			this.#encodeTokens(parse(removeParams(pathString)).tokens),
-		).join("");
-		if (query) {
-			for (const [key, value] of new URLSearchParams(query)) {
-				url.searchParams.set(key, value);
-			}
-		}
-		return `${idPrefix}${method === "" ? "" : METHOD_TO_ENCODING[method as Method]}${encodedPath}${url.search}`;
+		// don't check validity; path may include query params
+		const location = new Location(pathToString(path, false), query);
+		location.tokens = this.#encodeTokens(location.tokens);
+
+		return `${idPrefix}${method === "" ? "" : METHOD_TO_ENCODING[method as Method]}${location.toString()}`;
 	};
 
 	#encodeTokens(tokens: Token[]): Token[] {
@@ -125,10 +118,30 @@ export class Encoder {
 			} else {
 				const segments = this.#tokensToSegments([token]);
 				encodedTokens.push(
-					...segments.map((s): Text => ({
-						type: "text",
-						value: this.#segmentToEncoding.get(s) ?? this.#registerSegment(s),
-					})),
+					...segments
+						.map((s): Token | Token[] => {
+							const encodedValue = this.#segmentToEncoding.get(s);
+							if (encodedValue === undefined) {
+								for (const char of s) {
+									const codepoint = char.codePointAt(0)!;
+									if (
+										codepoint >= PUA_START &&
+										codepoint < PUA_START + PUA_RANGE
+									) {
+										throw new Error(
+											`Path segment "${s}" contains a reserved Private Use Area character (U+${codepoint.toString(16)}). Segments containing PUA characters must be preregistered using registerPath or registerToken.`,
+										);
+									}
+								}
+							}
+							return encodedValue === undefined
+								? parse(s).tokens
+								: {
+										type: "text",
+										value: encodedValue,
+									};
+						})
+						.flat(),
 				);
 			}
 		}
@@ -149,56 +162,55 @@ export class Encoder {
 		const customId = interaction.customId;
 		if (!customId.startsWith(idPrefix)) return false;
 
-		const decodedPath = this.decodePath(interaction.customId, idPrefix);
+		const decodedPath = this.decodePath(interaction.customId, { idPrefix });
 		if (decodedPath === false) return false;
 
 		if (interaction.isButton()) {
 			return {
 				method: decodedPath.method,
-				path: this.#urlToPathString(
-					this.#fillParams(decodedPath.path, {
-						ts: interaction.createdTimestamp.toString(),
-					}),
-				),
+				path: this.#fillParams(decodedPath.path, {
+					ts: interaction.createdTimestamp.toString(),
+				}).toString(),
 			};
 		} else if (interaction.isAnySelectMenu()) {
 			if (interaction.values.length === 0) return false;
 
 			if (interaction.isStringSelectMenu()) {
 				// also fill in variables for to's
-				const toRes = this.decodePath(interaction.values[0]!, "");
-				const toURL = toRes
-					? this.#fillParams(decodedPath.path, {
+				const toRes = this.decodePath(interaction.values[0]!, {
+					idPrefix: "",
+					allowEmptyMethod: true,
+				});
+				const toLocation = toRes
+					? this.#fillParams(toRes.path, {
 							ts: interaction.createdTimestamp.toString(),
 						})
 					: undefined;
-				const pathURL = this.#fillParams(decodedPath.path, {
+				const pathLocation = this.#fillParams(decodedPath.path, {
 					ts: interaction.createdTimestamp.toString(),
-					to: toURL ? toURL.pathname.split("/").slice(1) : "",
+					to: toLocation?.pathname.split("/").slice(1) ?? [""],
 				});
 
 				// merge query params
-				for (const [key, value] of toURL?.searchParams ?? []) {
-					pathURL.searchParams.append(key, value);
+				for (const [key, value] of toLocation?.queryParams ?? []) {
+					pathLocation.queryParams.append(key, value);
 				}
 				return {
 					method: decodedPath.method,
-					path: this.#urlToPathString(pathURL),
+					path: pathLocation.toString(),
 				};
 			}
 
 			return {
 				method: decodedPath.method,
-				path: this.#urlToPathString(
-					this.#fillParams(decodedPath.path, {
-						ts: interaction.createdTimestamp.toString(),
-						[interaction.isChannelSelectMenu()
-							? "channelId"
-							: interaction.isRoleSelectMenu()
-								? "roleId"
-								: "userId"]: interaction.values[0]!,
-					}),
-				),
+				path: this.#fillParams(decodedPath.path, {
+					ts: interaction.createdTimestamp.toString(),
+					[interaction.isChannelSelectMenu()
+						? "channelId"
+						: interaction.isRoleSelectMenu()
+							? "roleId"
+							: "userId"]: interaction.values[0]!,
+				}).toString(),
 			};
 		}
 
@@ -210,39 +222,62 @@ export class Encoder {
 	 *
 	 * @param path the encoded path
 	 * @param idPrefix string that the encoded path was prefixed with
+	 * @param allowEmptyMethod if set to true, path will decode with possiblity of method being ""
 	 * @returns the decoded path
 	 */
 	public decodePath<P extends Path>(
 		path: P,
-		idPrefix: string,
-	): { method: Method; path: string } | false {
-		// don't check validity; path may include url params
+		options: { idPrefix: string; allowEmptyMethod?: false },
+	): { method: Method; path: string } | false;
+	public decodePath<P extends Path>(
+		path: P,
+		options: { idPrefix: string; allowEmptyMethod: true },
+	): { method: Method | ""; path: string } | false;
+	public decodePath<P extends Path>(
+		path: P,
+		{
+			idPrefix,
+			allowEmptyMethod = false,
+		}: { idPrefix: string; allowEmptyMethod?: boolean },
+	): { method: Method | ""; path: string } | false {
+		// don't check validity; path may include query params
 		const pathString = pathToString(path, false);
 		if (!pathString.startsWith(idPrefix)) return false;
 
-		const res = this.#parseMethodAndPath(pathString.slice(idPrefix.length));
+		const res = allowEmptyMethod
+			? this.#parseMethodAndPath(pathString.slice(idPrefix.length), true)
+			: this.#parseMethodAndPath(pathString.slice(idPrefix.length), false);
 		if (!res) return false;
 		const { method, path: encodedPath } = res;
-		const encodedURL = new URL(encodedPath, BASE_URL);
-		const decodedPath = this.#tokensToSegments(
-			this.#decodeTokens(parse(removeParams(encodedPath)).tokens),
-		).join("");
+		const location = new Location(encodedPath);
+		location.tokens = this.#decodeTokens(location.tokens);
 
 		return {
 			method,
-			path: `${decodedPath}${encodedURL.search}`,
+			path: location.toString(),
 		};
 	}
 
 	#parseMethodAndPath(
 		pathWithMethod: string,
-	): { method: Method; path: string } | false {
+		allowEmptyMethod?: false,
+	): { method: Method; path: string } | false;
+	#parseMethodAndPath(
+		pathWithMethod: string,
+		allowEmptyMethod: true,
+	): { method: Method | ""; path: string };
+	#parseMethodAndPath(
+		pathWithMethod: string,
+		allowEmptyMethod = false,
+	): { method: Method | ""; path: string } | false {
 		const firstChar = pathWithMethod.charAt(0);
-		if (!isMethodEncoding(firstChar)) return false;
+		if (!isMethodEncoding(firstChar)) {
+			if (allowEmptyMethod) return { method: "", path: pathWithMethod };
+			return false;
+		}
 
-		const method = ENCODING_TO_METHOD[firstChar];
 		return {
-			method,
+			method: ENCODING_TO_METHOD[firstChar],
 			path: pathWithMethod.slice(1),
 		};
 	}
@@ -257,7 +292,7 @@ export class Encoder {
 				});
 			} else {
 				const segments = this.#tokensToSegments([token])
-					.map((s) => s.split(""))
+					.map((s) => s.split(PUA_SPLIT_PATTERN))
 					.flat();
 				decodedTokens.push(
 					...segments
@@ -272,29 +307,25 @@ export class Encoder {
 	#fillParams(
 		path: string,
 		params: Partial<Record<string, string | string[]>> = {},
-	): URL {
-		const url = new URL(path, BASE_URL);
-		const toPath = compile(url.pathname);
+	): Location {
+		const location = new Location(path);
+		const toPath = compile(location.pathname);
 
-		url.pathname = toPath(params);
-		for (const [key, value] of url.searchParams) {
+		location.pathname = toPath(params);
+		for (const [key, value] of location.queryParams) {
 			if (value.startsWith(":") && value.slice(1) in params) {
 				const paramValue = params?.[value.slice(1)];
 				if (paramValue) {
-					url.searchParams.set(
+					location.queryParams.set(
 						key,
 						Array.isArray(paramValue) ? paramValue.join("/") : paramValue,
 					);
 				} else {
-					url.searchParams.delete(key);
+					location.queryParams.delete(key);
 				}
 			}
 		}
-		return url;
-	}
-
-	#urlToPathString(url: URL): string {
-		return `${url.pathname}${url.search}`;
+		return location;
 	}
 
 	#tokensToSegments(tokens: Token[]): string[] {

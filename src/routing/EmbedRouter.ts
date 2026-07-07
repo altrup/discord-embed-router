@@ -22,10 +22,10 @@ import {
 	MessageFlags,
 	Snowflake,
 } from "discord.js";
-import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "../consts";
+import { ID_PREFIX, PUA_RANGE, PUA_START } from "../consts";
 import { pathToString } from "../helpers/pathToString";
 import { Encoder } from "../encoding/Encoder";
-import { removeParams } from "../helpers/removeParams";
+import { Location } from "../helpers/Location";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
@@ -133,6 +133,11 @@ export class EmbedRouter<
 		this.#routes.set(method, methodRoutes);
 
 		// register segments with encoder
+		if (Array.isArray(routePath)) {
+			routePath.forEach((p) => this.#encoder.registerPath(p));
+		} else {
+			this.#encoder.registerPath(routePath);
+		}
 	}
 
 	/**
@@ -281,7 +286,6 @@ export class EmbedRouter<
 		if (interaction.isAutocomplete())
 			throw new Error("Autocomplete Interactions aren't supported");
 
-		// don't check validity because url params are considered invalid
 		const routeResponse = await this.#resolve(path, {
 			interaction,
 			method,
@@ -362,16 +366,15 @@ export class EmbedRouter<
 			locals?: L | undefined;
 		},
 	): Promise<RouteResponse | undefined | false> {
-		// don't check validity because url params are considered invalid
+		// don't check validity because query params are considered invalid
 		const pathString = pathToString(path, false);
-		const rawPath = removeParams(pathString);
-		const url = new URL(pathString, BASE_URL);
+		const location = new Location(pathString);
 		for (const route of this.#routes.get(method) ?? []) {
-			const result = route.matchFunction(rawPath);
+			const result = route.matchFunction(location.pathname);
 			if (result) {
 				return await route.handler(interaction, {
 					...(result as MatchResult<ExtractParams<P>>),
-					query: url.searchParams,
+					query: location.queryParams,
 					embedRouter: this,
 					locals,
 				});

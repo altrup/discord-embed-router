@@ -32,18 +32,18 @@ const testRoutes: {
 		method: "DELETE",
 	},
 	{
-		path: "user/*path",
+		path: "user⤃/*path",
 		method: "POST",
 	},
 ];
 
-const encoder = new Encoder();
-
-for (const testRoute of testRoutes) {
-	encoder.registerPath(testRoute.path);
-}
-
 test("Encoder preserves routes", () => {
+	const encoder = new Encoder();
+
+	for (let i = 0; i < testRoutes.length / 2; i++) {
+		encoder.registerPath(testRoutes[i]!.path);
+	}
+
 	for (const testRoute of testRoutes) {
 		expect(
 			encoder.decodePath(
@@ -51,7 +51,7 @@ test("Encoder preserves routes", () => {
 					method: testRoute.method,
 					idPrefix: ID_PREFIX,
 				}),
-				ID_PREFIX,
+				{ idPrefix: ID_PREFIX },
 			),
 		).toStrictEqual(testRoute);
 	}
