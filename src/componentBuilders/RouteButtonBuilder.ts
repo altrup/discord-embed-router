@@ -1,10 +1,12 @@
-import { APIButtonComponent, ButtonBuilder } from "discord.js";
+import { ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
-import { EmbedRouter } from "../EmbedRouter";
-import { encodePath } from "../helpers/encodePath";
-import { RouteOptions } from "../types/componentBuilders";
+import { EmbedRouter } from "../routing/EmbedRouter";
+import { RouteOptions } from "../routing/types";
 
-export class RouteButtonBuilder<L> extends ButtonBuilder {
+export class RouteButtonBuilder<
+	L extends object,
+	P extends Path = Path,
+> extends ButtonBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -14,11 +16,19 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?: Omit<Partial<APIButtonComponent>, "custom_id" | "url"> | undefined,
+		data?: Omit<
+			ConstructorParameters<typeof ButtonBuilder>[0],
+			"custom_id" | "url"
+		> & {
+			to?: P | undefined;
+			toOptions?: RouteOptions | undefined;
+		},
 	) {
-		super(data);
+		const { to, toOptions, ...rest } = data ?? {};
+		super(rest);
 
 		this.#embedRouter = embedRouter;
+		if (to) this.setTo(to, toOptions);
 	}
 
 	/**
@@ -46,15 +56,10 @@ export class RouteButtonBuilder<L> extends ButtonBuilder {
 	 * @param query any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>(
-		path: P,
-		{ method = "GET", query }: RouteOptions = {},
-	): this {
+	public setTo(path: P, { method = "GET", query }: RouteOptions = {}): this {
 		super.setCustomId(
-			encodePath({
-				idPrefix: this.#embedRouter.getIdPrefix(),
+			this.#embedRouter.encodePath(path, {
 				method,
-				path,
 				query,
 			}),
 		);

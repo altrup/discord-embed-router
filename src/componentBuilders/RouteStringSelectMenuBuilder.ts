@@ -1,5 +1,4 @@
 import {
-	APIStringSelectComponent,
 	normalizeArray,
 	RestOrArray,
 	StringSelectMenuBuilder,
@@ -7,11 +6,12 @@ import {
 } from "discord.js";
 import { Path } from "path-to-regexp";
 import { RouteStringSelectMenuOptionBuilder } from "./RouteStringSelectMenuOptionBuilder";
-import { EmbedRouter } from "../EmbedRouter";
-import { encodePath } from "../helpers/encodePath";
-import { RouteOptions } from "../types/componentBuilders";
-
-export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
+import { EmbedRouter } from "../routing/EmbedRouter";
+import { RouteOptions } from "../routing/types";
+export class RouteStringSelectMenuBuilder<
+	L extends object,
+	P extends Path = Path,
+> extends StringSelectMenuBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -23,21 +23,28 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?:
-			| Partial<StringSelectMenuComponentData | APIStringSelectComponent>
-			| undefined,
+		data?: Omit<StringSelectMenuComponentData, "customId" | "options"> & {
+			pattern?: P | undefined;
+			patternOptions?: RouteOptions | undefined;
+			tos: readonly RouteStringSelectMenuOptionBuilder<L, P>[];
+		},
 	) {
-		super(data);
+		const { pattern, patternOptions, tos, ...rest } = data ?? {};
+		super(rest);
 
 		this.#embedRouter = embedRouter;
 
-		super.setCustomId(
-			encodePath({
-				idPrefix: this.#embedRouter.getIdPrefix(),
-				method: "GET",
-				path: "/*to",
-			}),
-		);
+		if (pattern) {
+			this.setPattern(pattern, patternOptions);
+		} else {
+			super.setCustomId(
+				this.#embedRouter.encodePath("/*to", {
+					method: "GET",
+				}),
+			);
+		}
+
+		if (tos) this.setTos(...tos);
 	}
 
 	/**
@@ -80,7 +87,7 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 */
 	public addTos(
 		...tos: RestOrArray<
-			| RouteStringSelectMenuOptionBuilder
+			| RouteStringSelectMenuOptionBuilder<L, P>
 			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
 		>
 	): this {
@@ -102,7 +109,7 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 */
 	public setTos(
 		...tos: RestOrArray<
-			| RouteStringSelectMenuOptionBuilder
+			| RouteStringSelectMenuOptionBuilder<L>
 			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
 		>
 	): this {
@@ -124,15 +131,10 @@ export class RouteStringSelectMenuBuilder<L> extends StringSelectMenuBuilder {
 	 * @param query any query parameters you want to add, can include :ts :to *to
 	 * @param method method to send to route
 	 */
-	public setPattern<P extends Path>(
-		path: P,
-		{ method = "GET", query }: RouteOptions = {},
-	) {
+	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
 		super.setCustomId(
-			encodePath({
-				idPrefix: this.#embedRouter.getIdPrefix(),
+			this.#embedRouter.encodePath(path, {
 				method,
-				path,
 				query,
 			}),
 		);

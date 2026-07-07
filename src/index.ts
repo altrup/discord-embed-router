@@ -1,4 +1,4 @@
-export { EmbedRouter } from "./EmbedRouter";
+export { EmbedRouter } from "./routing/EmbedRouter";
 
 export { RouteButtonBuilder } from "./componentBuilders/RouteButtonBuilder";
 export { RouteStringSelectMenuBuilder } from "./componentBuilders/RouteStringSelectMenuBuilder";
@@ -7,4 +7,13 @@ export { RouteChannelSelectMenuBuilder } from "./componentBuilders/RouteChannelS
 export { RouteRoleSelectMenuBuilder } from "./componentBuilders/RouteRoleSelectMenuBuilder";
 export { RouteUserSelectMenuBuilder } from "./componentBuilders/RouteUserSelectMenuBuilder";
 
-export type * from "./types/routes";
+export type {
+	State,
+	RouteResponse,
+	RouteHandler,
+	CleanupHandler,
+	Method,
+	RouteOptions,
+	RouteOptionsWithMethod,
+	ExtractParams,
+} from "./routing/types";

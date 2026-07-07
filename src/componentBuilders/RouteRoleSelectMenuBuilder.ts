@@ -1,14 +1,12 @@
-import {
-	APIRoleSelectComponent,
-	RoleSelectMenuBuilder,
-	RoleSelectMenuComponentData,
-} from "discord.js";
-import { EmbedRouter } from "../EmbedRouter";
+import { RoleSelectMenuBuilder } from "discord.js";
+import { EmbedRouter } from "../routing/EmbedRouter";
 import { Path } from "path-to-regexp";
-import { encodePath } from "../helpers/encodePath";
-import { RouteOptions } from "../types/componentBuilders";
+import { RouteOptions } from "../routing/types";
 
-export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
+export class RouteRoleSelectMenuBuilder<
+	L extends object,
+	P extends Path = Path,
+> extends RoleSelectMenuBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -18,12 +16,19 @@ export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?:
-			Partial<RoleSelectMenuComponentData | APIRoleSelectComponent> | undefined,
+		data?: Omit<
+			ConstructorParameters<typeof RoleSelectMenuBuilder>[0],
+			"customId"
+		> & {
+			pattern?: P | undefined;
+			patternOptions?: RouteOptions | undefined;
+		},
 	) {
-		super(data);
+		const { pattern, patternOptions, ...rest } = data ?? {};
+		super(rest);
 
 		this.#embedRouter = embedRouter;
+		if (pattern) this.setPattern(pattern, patternOptions);
 	}
 
 	/**
@@ -44,15 +49,10 @@ export class RouteRoleSelectMenuBuilder<L> extends RoleSelectMenuBuilder {
 	 * @param query any query parameters you want to add, can include :ts :roleId
 	 * @param method method to send to route
 	 */
-	public setPattern<P extends Path>(
-		path: P,
-		{ method = "GET", query }: RouteOptions = {},
-	) {
+	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
 		super.setCustomId(
-			encodePath({
-				idPrefix: this.#embedRouter.getIdPrefix(),
+			this.#embedRouter.encodePath(path, {
 				method,
-				path,
 				query,
 			}),
 		);

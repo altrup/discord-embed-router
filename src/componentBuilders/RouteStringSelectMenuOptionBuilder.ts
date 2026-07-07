@@ -1,9 +1,38 @@
-import { StringSelectMenuOptionBuilder } from "discord.js";
+import {
+	SelectMenuComponentOptionData,
+	StringSelectMenuOptionBuilder,
+} from "discord.js";
 import { Path } from "path-to-regexp";
-import { encodePath } from "../helpers/encodePath";
-import { RouteOptions } from "../types/componentBuilders";
+import { EmbedRouter } from "../routing/EmbedRouter";
+import { RouteOptions } from "../routing/types";
 
-export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBuilder {
+export class RouteStringSelectMenuOptionBuilder<
+	L extends object,
+	P extends Path = Path,
+> extends StringSelectMenuOptionBuilder {
+	#embedRouter: EmbedRouter<L>;
+
+	/**
+	 *
+	 * @param embedRouter the router you want to route with
+	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
+	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 * @param data the data to construct a component out of
+	 */
+	constructor(
+		embedRouter: EmbedRouter<L>,
+		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
+			label: string;
+			to: P;
+			toOptions?: RouteOptions<true> | undefined;
+		},
+	) {
+		const { to, toOptions, label, ...rest } = data ?? {};
+		super({ ...rest, value: "", label: label ?? "" });
+
+		this.#embedRouter = embedRouter;
+		if (to) this.setTo(to, toOptions);
+	}
 	/**
 	 * Not supported for RouteStringSelectMenuOptionBuilder (use setTo)
 	 *
@@ -22,15 +51,11 @@ export class RouteStringSelectMenuOptionBuilder extends StringSelectMenuOptionBu
 	 * @param query any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
-	public setTo<P extends Path>(
-		path: P,
-		{ method = "", query }: RouteOptions<true> = {},
-	): this {
+	public setTo(path: P, { method = "", query }: RouteOptions<true> = {}): this {
 		super.setValue(
-			encodePath<true>({
+			this.#embedRouter.encodePath<true>(path, {
 				idPrefix: "",
 				method,
-				path,
 				query,
 			}),
 		);

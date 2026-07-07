@@ -1,14 +1,12 @@
-import {
-	APIUserSelectComponent,
-	UserSelectMenuBuilder,
-	UserSelectMenuComponentData,
-} from "discord.js";
-import { EmbedRouter } from "../EmbedRouter";
+import { UserSelectMenuBuilder, UserSelectMenuComponentData } from "discord.js";
+import { EmbedRouter } from "../routing/EmbedRouter";
 import { Path } from "path-to-regexp";
-import { encodePath } from "../helpers/encodePath";
-import { RouteOptions } from "../types/componentBuilders";
+import { RouteOptions } from "../routing/types";
 
-export class RouteUserSelectMenuBuilder<L> extends UserSelectMenuBuilder {
+export class RouteUserSelectMenuBuilder<
+	L extends object,
+	P extends Path = Path,
+> extends UserSelectMenuBuilder {
 	#embedRouter: EmbedRouter<L>;
 
 	/**
@@ -18,12 +16,16 @@ export class RouteUserSelectMenuBuilder<L> extends UserSelectMenuBuilder {
 	 */
 	constructor(
 		embedRouter: EmbedRouter<L>,
-		data?:
-			Partial<UserSelectMenuComponentData | APIUserSelectComponent> | undefined,
+		data?: Omit<UserSelectMenuComponentData, "customId"> & {
+			pattern?: P | undefined;
+			patternOptions?: RouteOptions | undefined;
+		},
 	) {
-		super(data);
+		const { pattern, patternOptions, ...rest } = data ?? {};
+		super(rest);
 
 		this.#embedRouter = embedRouter;
+		if (pattern) this.setPattern(pattern, patternOptions);
 	}
 
 	/**
@@ -44,15 +46,10 @@ export class RouteUserSelectMenuBuilder<L> extends UserSelectMenuBuilder {
 	 * @param query any query parameters you want to add, can include :ts :userId
 	 * @param method method to send to route
 	 */
-	public setPattern<P extends Path>(
-		path: P,
-		{ method = "GET", query }: RouteOptions = {},
-	) {
+	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
 		super.setCustomId(
-			encodePath({
-				idPrefix: this.#embedRouter.getIdPrefix(),
+			this.#embedRouter.encodePath<true>(path, {
 				method,
-				path,
 				query,
 			}),
 		);

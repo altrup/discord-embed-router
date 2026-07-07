@@ -8,8 +8,12 @@ import type {
 	Method,
 	RouteHandler,
 	RouteResponse,
-} from "./types/routes";
-import type { ExtractParams } from "./types/ExtractParams";
+	ExtractParams,
+	Args,
+	EventNames,
+	Listener,
+	RouteOptionsWithMethod,
+} from "./types";
 import {
 	AnySelectMenuInteraction,
 	ButtonInteraction,
@@ -18,25 +22,27 @@ import {
 	MessageFlags,
 	Snowflake,
 } from "discord.js";
-import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "./consts";
-import { pathToString } from "./helpers/pathToString";
-import { decodePath } from "./helpers/decodePath";
-import { Args, EventNames, Listener } from "./types/EmbedRouterEvents";
+import { BASE_URL, ID_PREFIX, PUA_RANGE, PUA_START } from "../consts";
+import { pathToString } from "../helpers/pathToString";
+import { Encoder } from "../encoding/Encoder";
+import { removeParams } from "../helpers/removeParams";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
 };
 
-export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
+export class EmbedRouter<
+	L extends object,
+> extends EventEmitter<EmbedRouterEvents> {
 	// identifier -> embedRouter
-	static #usedIdentifiers = new Map<string, EmbedRouter<unknown>>();
+	static #usedIdentifiers = new Map<string, EmbedRouter<object>>();
 
 	// Name used to generate prefixes
 	#name = "";
 	// Prefix for customIds of RouteButtonBuilders
 	#idPrefix: string;
 	#identifier: string = "";
-	public getIdPrefix() {
+	get idPrefix() {
 		return `${this.#idPrefix}${this.#identifier}`;
 	}
 
@@ -52,10 +58,12 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 		}
 	> = new Map();
 
+	#encoder: Encoder = new Encoder();
+
 	/**
 	 *
 	 * @param name the name to give the router. ensures buttons stay connected across restarts
-	 * @param idPrefix the prefix for RouteButtonBuilder customIds
+	 * @param idPrefix the prefix for customIds
 	 */
 	constructor({
 		name = "",
@@ -99,12 +107,12 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 
 			nameCollisions.push(collisionRouter);
 		}
-		EmbedRouter.#usedIdentifiers.set(char, this as EmbedRouter<unknown>);
+		EmbedRouter.#usedIdentifiers.set(char, this as EmbedRouter<object>);
 
 		if (nameCollisions.length > 0 && this.#name.length > 0) {
 			process.emitWarning(
 				`EmbedRouter identifier collision for name "${this.#name}" with ${nameCollisions.map((c) => `"${c.#name}"`).join(", ")}`,
-				"EmbedRouterWarning",
+				"DiscordEmbedRouterWarning",
 			);
 		}
 		this.#identifier = char;
@@ -123,6 +131,8 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 			handler: handler as RouteHandler<M, L>,
 		});
 		this.#routes.set(method, methodRoutes);
+
+		// register segments with encoder
 	}
 
 	/**
@@ -229,7 +239,7 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 
 			await this.#runCleanup(interaction.message.id, false);
 
-			const res = decodePath({ idPrefix: this.getIdPrefix(), interaction });
+			const res = this.#encoder.decodeInteraction(interaction, this.idPrefix);
 			if (!res)
 				throw new Error(`Invalid component found: id ${interaction.customId}`);
 
@@ -320,7 +330,7 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 		if (!applyFn)
 			return process.emitWarning(
 				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return results will not be applied to message.`,
-				"EmbedRouterWarning",
+				"DiscordEmbedRouterWarning",
 			);
 
 		this.#addCleanup(
@@ -353,9 +363,11 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 		},
 	): Promise<RouteResponse | undefined | false> {
 		// don't check validity because url params are considered invalid
-		const url = new URL(pathToString(path, false), BASE_URL);
+		const pathString = pathToString(path, false);
+		const rawPath = removeParams(pathString);
+		const url = new URL(pathString, BASE_URL);
 		for (const route of this.#routes.get(method) ?? []) {
-			const result = route.matchFunction(url.pathname);
+			const result = route.matchFunction(rawPath);
 			if (result) {
 				return await route.handler(interaction, {
 					...(result as MatchResult<ExtractParams<P>>),
@@ -410,6 +422,34 @@ export class EmbedRouter<L> extends EventEmitter<EmbedRouterEvents> {
 				undefined,
 			);
 		}
+	}
+
+	/**
+	 *
+	 * @param path raw unencoded path
+	 * @param method the html method to encode into the path
+	 * @param query any query params to include in the encoded string
+	 * @param idPrefix string to prefix the encoded path with (optional, defaults to this router's prefix)
+	 * @returns
+	 */
+	public encodePath<
+		AllowEmptyMethod extends boolean = false,
+		P extends Path = Path,
+	>(
+		path: P,
+		{
+			method,
+			query,
+			idPrefix = this.idPrefix,
+		}: RouteOptionsWithMethod<AllowEmptyMethod> & {
+			idPrefix?: string | undefined;
+		},
+	) {
+		return this.#encoder.encodePath(path, {
+			idPrefix,
+			method,
+			query,
+		});
 	}
 
 	// event helpers
