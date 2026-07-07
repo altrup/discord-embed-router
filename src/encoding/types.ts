@@ -1,4 +1,4 @@
-import { METHOD_ENCODINGS } from "./consts";
+import { METHOD_ENCODINGS } from "@encoding/consts";
 
 export type MethodEncoding = (typeof METHOD_ENCODINGS)[number];
 export const isMethodEncoding = (char: string): char is MethodEncoding => {

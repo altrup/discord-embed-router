@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { parse, Path, stringify, Token } from "path-to-regexp";
 
-import { PUA_RANGE, PUA_START, PUA_SPLIT_PATTERN } from "../consts";
-import { ENCODING_TO_METHOD, METHOD_TO_ENCODING } from "./consts";
+import { PUA_RANGE, PUA_START, PUA_SPLIT_PATTERN } from "@src/consts";
+import { ENCODING_TO_METHOD, METHOD_TO_ENCODING } from "@encoding/consts";
 
-import { pathToString } from "../helpers/pathToString";
-import { isMethodEncoding } from "./types";
-import { Method, RouteOptionsWithMethod } from "../routing/types";
-import { Location } from "../helpers/Location";
+import { pathToString } from "@helpers/pathToString";
+import { isMethodEncoding } from "@encoding/types";
+import { Method, RouteOptionsWithMethod } from "@routing/types";
+import { Location } from "@helpers/Location";
 
 export class Encoder {
 	#segmentToEncoding: Map<string, string> = new Map();

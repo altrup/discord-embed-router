@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { Encoder } from "./Encoder";
-import { Method } from "../routing/types";
-import { ID_PREFIX } from "../consts";
+import { Encoder } from "@encoding/Encoder";
+import { Method } from "@routing/types";
+import { ID_PREFIX } from "@src/consts";
 
 const testRoutes: {
 	path: string;

@@ -1,7 +1,7 @@
 import { ChannelSelectMenuBuilder } from "discord.js";
-import { EmbedRouter } from "../routing/EmbedRouter";
 import { Path } from "path-to-regexp";
-import { RouteOptions } from "../routing/types";
+import { EmbedRouter } from "@routing/EmbedRouter";
+import { RouteOptions } from "@routing/types";
 
 export class RouteChannelSelectMenuBuilder<
 	L extends object,

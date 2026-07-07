@@ -1,7 +1,7 @@
 import { ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
-import { EmbedRouter } from "../routing/EmbedRouter";
-import { RouteOptions } from "../routing/types";
+import { EmbedRouter } from "@routing/EmbedRouter";
+import { RouteOptions } from "@routing/types";
 
 export class RouteButtonBuilder<
 	L extends object,

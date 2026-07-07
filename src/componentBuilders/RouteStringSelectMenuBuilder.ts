@@ -5,9 +5,9 @@ import {
 	StringSelectMenuComponentData,
 } from "discord.js";
 import { Path } from "path-to-regexp";
-import { RouteStringSelectMenuOptionBuilder } from "./RouteStringSelectMenuOptionBuilder";
-import { EmbedRouter } from "../routing/EmbedRouter";
-import { RouteOptions } from "../routing/types";
+import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
+import { EmbedRouter } from "@routing/EmbedRouter";
+import { RouteOptions } from "@routing/types";
 export class RouteStringSelectMenuBuilder<
 	L extends object,
 	P extends Path = Path,

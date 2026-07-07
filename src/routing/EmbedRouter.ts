@@ -27,10 +27,10 @@ import {
 	MessageFlags,
 	Snowflake,
 } from "discord.js";
-import { ID_PREFIX, PUA_RANGE, PUA_START } from "../consts";
-import { pathToString } from "../helpers/pathToString";
-import { Encoder } from "../encoding/Encoder";
-import { Location } from "../helpers/Location";
+import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
+import { pathToString } from "@helpers/pathToString";
+import { Encoder } from "@encoding/Encoder";
+import { Location } from "@helpers/Location";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
