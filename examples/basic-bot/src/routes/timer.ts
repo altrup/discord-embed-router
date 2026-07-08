@@ -62,6 +62,6 @@ export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 				clearTimeout(timeout);
 			}
 		},
-		timeout: Infinity,
+		timeout: 10 * 60_000,
 	};
 };
