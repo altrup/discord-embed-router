@@ -49,6 +49,7 @@ export class EmbedRouter<
 
 	// Not used after constructor, but stored to check if this router is capable of using RouteComponentBuilders
 	#client: Client | undefined;
+	#attachedListener = this.#listener.bind(this);
 
 	// Name used to generate prefixes
 	#name = "";
@@ -80,6 +81,17 @@ export class EmbedRouter<
 	#sessions: Map<Snowflake, Session> = new Map();
 	#sessionProvider: undefined | SessionProvider<Globals, Session, Locals>;
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
+
+	/**
+	 * Sets the client which we listen for interaections on
+	 *
+	 * @param client the client to listen to
+	 */
+	public setClient(client: Client) {
+		this.#client?.off("interactionCreate", this.#attachedListener);
+		this.#client = client;
+		client?.on("interactionCreate", this.#attachedListener);
+	}
 
 	/**
 	 * registers a session provider with this router
@@ -149,9 +161,7 @@ export class EmbedRouter<
 		this.#updateIdentifier();
 
 		this.#client = client;
-		client?.on("interactionCreate", (interaction) =>
-			this.#listener(interaction),
-		);
+		client?.on("interactionCreate", this.#attachedListener);
 	}
 
 	#updateIdentifier() {
