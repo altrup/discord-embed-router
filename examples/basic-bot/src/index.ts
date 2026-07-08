@@ -5,6 +5,7 @@ import {
 	Collection,
 	MessageFlags,
 } from "discord.js";
+import { EmbedRouter } from "discord-embed-router";
 import { DISCORD_GUILD_ID, DISCORD_TOKEN } from "@config";
 import { commands as commandsArray } from "@commands";
 import {
@@ -12,12 +13,17 @@ import {
 	CommandName,
 	isCommandName,
 } from "@commands/types";
-import { router } from "@routes";
+import { registerRoutes } from "@routes";
+import { Globals, Locals, Session } from "@routes/types";
 
 const client = new Client({
 	intents: [],
 	partials: [],
 });
+
+// set up embed router
+const router = new EmbedRouter<Globals, Session, Locals>(client);
+registerRoutes(router);
 
 // load commands
 const commands = new Collection<string, CommandImplementation>();
@@ -25,6 +31,11 @@ for (const command of commandsArray) {
 	commands.set(command.data.name, command);
 }
 const commandIds = new Collection<CommandName, string>();
+
+const globals = {
+	commandIds,
+};
+router.setGlobals(globals);
 
 // When the client is ready, set status
 client.once("clientReady", async () => {
@@ -53,16 +64,6 @@ client.on("shardResume", () => {
 });
 
 client.on("interactionCreate", async (interaction) => {
-	const locals = {
-		commandIds,
-	};
-
-	// ===== THIS IS REQUIRED TO USE CUSTOM ROUTE COMPONENTS =====
-	if (interaction.isButton() || interaction.isAnySelectMenu()) {
-		console.log(interaction.customId);
-		await router.listener(interaction, locals);
-	}
-
 	if (interaction.isCommand()) {
 		const command = commands.get(interaction.commandName);
 
@@ -70,7 +71,7 @@ client.on("interactionCreate", async (interaction) => {
 
 		try {
 			if (interaction instanceof ChatInputCommandInteraction) {
-				await command.execute(interaction, locals);
+				await command.execute(router, interaction, globals);
 			}
 		} catch (error) {
 			console.error(error);

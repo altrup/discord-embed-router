@@ -1,16 +1,16 @@
 import { join } from "node:path";
-import { ActionRowBuilder, EmbedBuilder, Interaction } from "discord.js";
+import { ActionRowBuilder, EmbedBuilder } from "discord.js";
 import {
 	RouteHandler,
 	RouteStringSelectMenuBuilder,
 	RouteStringSelectMenuOptionBuilder,
-	State,
 } from "discord-embed-router";
-import type { Locals } from "@routes/types";
+import type { Globals, Locals, Session } from "@routes/types";
 
-export const catalog: RouteHandler<"GET", Locals> = (
-	interaction: Interaction,
-	state: State<Locals>,
+export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
+	embedRouter,
+	interaction,
+	state,
 ) => {
 	return {
 		embeds: [
@@ -22,18 +22,18 @@ export const catalog: RouteHandler<"GET", Locals> = (
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteStringSelectMenuBuilder(state.embedRouter)
+					new RouteStringSelectMenuBuilder(embedRouter)
 						.setPlaceholder("Choose a page")
 						.setTos(
-							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("Counter")
 								.setDescription("A simple counter page")
 								.setTo(join(state.path, "counter")),
-							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("User Info")
 								.setDescription("View someone's user info")
 								.setTo(join(state.path, "user-info")),
-							new RouteStringSelectMenuOptionBuilder(state.embedRouter)
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("Timer")
 								.setDescription("A sample timer page")
 								.setTo(join(state.path, "timer")),

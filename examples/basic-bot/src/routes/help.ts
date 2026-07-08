@@ -3,14 +3,14 @@ import {
 	ButtonBuilder,
 	ButtonStyle,
 	EmbedBuilder,
-	Interaction,
 } from "discord.js";
-import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
-import type { Locals } from "@routes/types";
+import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
+import type { Globals, Locals, Session } from "@routes/types";
 
-export const help: RouteHandler<"GET", Locals> = (
-	interaction: Interaction,
-	state: State<Locals>,
+export const help: RouteHandler<"GET", Globals, Session, Locals> = (
+	embedRouter,
+	interaction,
+	state,
 ) => {
 	return {
 		embeds: [
@@ -20,13 +20,13 @@ export const help: RouteHandler<"GET", Locals> = (
 				.setDescription("The example bot for discord-embed-builder")
 				.addFields({
 					name: "Counter",
-					value: `Use </catalog:${state.locals?.commandIds.get("catalog")}> to view a list of all commands`,
+					value: `Use </catalog:${state.globals?.commandIds.get("catalog")}> to view a list of all commands`,
 				}),
 		],
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder(state.embedRouter)
+					new RouteButtonBuilder(embedRouter)
 						.setLabel("Catalog")
 						.setStyle(ButtonStyle.Primary)
 						.setTo("/catalog"),

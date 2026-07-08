@@ -4,16 +4,18 @@ import {
 	MessageFlags,
 } from "discord.js";
 
-import { router } from "@routes";
-import type { Locals } from "@routes/types";
+import { EmbedRouter } from "discord-embed-router";
+import { Globals, Locals, Session } from "@routes/types";
 
 export const catalog = {
 	data: new SlashCommandBuilder()
 		.setName("catalog")
 		.setDescription("Command Catalog"),
-	async execute(interaction: ChatInputCommandInteraction, locals: Locals) {
+	async execute(
+		router: EmbedRouter<Globals, Session, Locals>,
+		interaction: ChatInputCommandInteraction,
+	) {
 		router.dispatch(interaction, "/catalog", {
-			locals,
 			flags: [MessageFlags.Ephemeral],
 		});
 	},

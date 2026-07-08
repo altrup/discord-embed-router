@@ -1,15 +1,11 @@
-import {
-	ActionRowBuilder,
-	ButtonStyle,
-	EmbedBuilder,
-	Interaction,
-} from "discord.js";
-import { RouteButtonBuilder, RouteHandler, State } from "discord-embed-router";
-import type { Locals } from "@routes/types";
+import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
+import type { Globals, Locals, Session } from "@routes/types";
 
-export const timer: RouteHandler<"GET", Locals> = (
-	interaction: Interaction,
-	state: State<Locals>,
+export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
+	embedRouter,
+	interaction,
+	state,
 ) => {
 	const startTime = parseInt(state.queryParams.get("startTime") ?? "");
 	const dur = parseInt(state.queryParams.get("dur") ?? "");
@@ -17,7 +13,7 @@ export const timer: RouteHandler<"GET", Locals> = (
 
 	const timeout = !isNaN(endTime)
 		? setTimeout(() => {
-				state.embedRouter.dispatch(interaction, state.path);
+				embedRouter.dispatch(interaction, state.path);
 			}, endTime - new Date().getTime())
 		: null;
 
@@ -35,12 +31,12 @@ export const timer: RouteHandler<"GET", Locals> = (
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder(state.embedRouter)
+					new RouteButtonBuilder(embedRouter)
 						.setLabel("Stop")
 						.setStyle(ButtonStyle.Danger)
 						.setDisabled(isNaN(endTime))
 						.setTo(state.path),
-					new RouteButtonBuilder(state.embedRouter)
+					new RouteButtonBuilder(embedRouter)
 						.setLabel("Start")
 						.setStyle(ButtonStyle.Success)
 						.setDisabled(!isNaN(endTime))
@@ -54,7 +50,7 @@ export const timer: RouteHandler<"GET", Locals> = (
 				.toJSON(),
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder(state.embedRouter)
+					new RouteButtonBuilder(embedRouter)
 						.setLabel("Back")
 						.setStyle(ButtonStyle.Secondary)
 						.setTo("/catalog"),

@@ -2,7 +2,8 @@ import type {
 	ChatInputCommandInteraction,
 	SharedSlashCommand,
 } from "discord.js";
-import type { Locals } from "@routes/types";
+import { EmbedRouter } from "discord-embed-router";
+import type { Globals, Locals, Session } from "@routes/types";
 
 export const commandNamesList = ["help", "catalog"] as const;
 export type CommandName = (typeof commandNamesList)[number];
@@ -17,7 +18,8 @@ export const isCommandName = (
 export type CommandImplementation = {
 	data: SharedSlashCommand;
 	execute: (
+		router: EmbedRouter<Globals, Session, Locals>,
 		interaction: ChatInputCommandInteraction,
-		locals: Locals,
+		globals: Globals,
 	) => Promise<void>;
 };

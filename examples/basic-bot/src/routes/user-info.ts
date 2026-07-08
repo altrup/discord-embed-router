@@ -1,21 +1,16 @@
 import { join } from "node:path";
-import {
-	ActionRowBuilder,
-	ButtonStyle,
-	EmbedBuilder,
-	Interaction,
-} from "discord.js";
+import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import {
 	RouteButtonBuilder,
 	RouteHandler,
 	RouteUserSelectMenuBuilder,
-	State,
 } from "discord-embed-router";
-import type { Locals } from "@routes/types";
+import type { Globals, Locals, Session } from "@routes/types";
 
-export const userInfo: RouteHandler<"GET", Locals> = async (
-	interaction: Interaction,
-	state: State<Locals>,
+export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
+	embedRouter,
+	interaction,
+	state,
 ) => {
 	const userId =
 		typeof state.params.userId === "string" ? state.params.userId : undefined;
@@ -52,7 +47,7 @@ export const userInfo: RouteHandler<"GET", Locals> = async (
 		components: [
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteUserSelectMenuBuilder(state.embedRouter)
+					new RouteUserSelectMenuBuilder(embedRouter)
 						.setPattern(join(state.path.replace(userId ?? "", ""), ":userId"))
 						.setPlaceholder("Choose a user")
 						.setDefaultUsers(userId ? [userId] : []),
@@ -60,7 +55,7 @@ export const userInfo: RouteHandler<"GET", Locals> = async (
 				.toJSON(),
 			new ActionRowBuilder()
 				.addComponents(
-					new RouteButtonBuilder(state.embedRouter)
+					new RouteButtonBuilder(embedRouter)
 						.setLabel("Back")
 						.setStyle(ButtonStyle.Secondary)
 						.setTo("/catalog"),
