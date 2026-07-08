@@ -94,6 +94,15 @@ export class EmbedRouter<
 	}
 
 	/**
+	 * Set the globals for a router
+	 *
+	 * @param globals new globals
+	 */
+	public setGlobals(globals: Globals) {
+		this.#globals = globals;
+	}
+
+	/**
 	 * registers a session provider with this router
 	 *
 	 * @param sessionProvider the session provider to set
