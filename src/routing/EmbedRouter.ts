@@ -120,6 +120,7 @@ export class EmbedRouter<
 	 * @param client the client from discord.js to connect to
 	 * @param name the name to give the router. ensures buttons stay connected across restarts
 	 * @param idPrefix the prefix for customIds
+	 * @param globals object to pass into all routes
 	 */
 	constructor(
 		client?: Client | undefined,
