@@ -6,7 +6,7 @@
 		"",
 		"<THIRD_PARTY_MODULES>",
 		"",
-		"^@(src|routing|encoding|componentBuilders|helpers)/",
+		"^@(@command|config|routes)/",
 		"",
 		"^[./]"
 	]

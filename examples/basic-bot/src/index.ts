@@ -7,7 +7,6 @@ import {
 } from "@commands/types";
 import { DISCORD_GUILD_ID, DISCORD_TOKEN } from "@config";
 import { registerRoutes } from "@routes";
-import { Globals, Locals, Session } from "@routes/types";
 import { EmbedRouter } from "discord-embed-router";
 import {
 	ChatInputCommandInteraction,
@@ -16,6 +15,8 @@ import {
 	MessageFlags,
 } from "discord.js";
 
+import { Globals, Locals, Session } from "@routes/types";
+
 const client = new Client({
 	intents: [],
 	partials: [],
@@ -23,6 +24,10 @@ const client = new Client({
 
 // set up embed router
 const router = new EmbedRouter<Globals, Session, Locals>(client);
+// listen to discord-embed-router errors and warnings
+router.onError(console.error);
+process.on("warning", console.error);
+
 registerRoutes(router);
 
 // load commands

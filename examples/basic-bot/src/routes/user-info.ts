@@ -1,12 +1,13 @@
 import { join } from "node:path";
 
-import type { Globals, Locals, Session } from "@routes/types";
 import {
 	RouteButtonBuilder,
 	RouteHandler,
 	RouteUserSelectMenuBuilder,
 } from "discord-embed-router";
 import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+
+import type { Globals, Locals, Session } from "@routes/types";
 
 export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
 	embedRouter,
