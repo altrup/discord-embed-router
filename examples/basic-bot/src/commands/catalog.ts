@@ -1,11 +1,10 @@
+import { Globals, Locals, Session } from "@routes/types";
+import { EmbedRouter } from "discord-embed-router";
 import {
-	SlashCommandBuilder,
 	ChatInputCommandInteraction,
 	MessageFlags,
+	SlashCommandBuilder,
 } from "discord.js";
-
-import { EmbedRouter } from "discord-embed-router";
-import { Globals, Locals, Session } from "@routes/types";
 
 export const catalog = {
 	data: new SlashCommandBuilder()

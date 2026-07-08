@@ -1,20 +1,20 @@
 // data is updated basically in every file
-import {
-	ChatInputCommandInteraction,
-	Client,
-	Collection,
-	MessageFlags,
-} from "discord.js";
-import { EmbedRouter } from "discord-embed-router";
-import { DISCORD_GUILD_ID, DISCORD_TOKEN } from "@config";
 import { commands as commandsArray } from "@commands";
 import {
 	CommandImplementation,
 	CommandName,
 	isCommandName,
 } from "@commands/types";
+import { DISCORD_GUILD_ID, DISCORD_TOKEN } from "@config";
 import { registerRoutes } from "@routes";
 import { Globals, Locals, Session } from "@routes/types";
+import { EmbedRouter } from "discord-embed-router";
+import {
+	ChatInputCommandInteraction,
+	Client,
+	Collection,
+	MessageFlags,
+} from "discord.js";
 
 const client = new Client({
 	intents: [],

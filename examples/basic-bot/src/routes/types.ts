@@ -1,5 +1,5 @@
-import { Collection } from "discord.js";
 import type { CommandName } from "@commands/types";
+import { Collection } from "discord.js";
 
 export type Globals = {
 	commandIds: Collection<CommandName, string>;

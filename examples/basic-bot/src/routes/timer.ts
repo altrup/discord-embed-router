@@ -1,6 +1,6 @@
-import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
-import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
 import type { Globals, Locals, Session } from "@routes/types";
+import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
+import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 
 export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,

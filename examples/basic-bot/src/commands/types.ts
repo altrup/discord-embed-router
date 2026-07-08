@@ -1,9 +1,9 @@
+import type { Globals, Locals, Session } from "@routes/types";
+import { EmbedRouter } from "discord-embed-router";
 import type {
 	ChatInputCommandInteraction,
 	SharedSlashCommand,
 } from "discord.js";
-import { EmbedRouter } from "discord-embed-router";
-import type { Globals, Locals, Session } from "@routes/types";
 
 export const commandNamesList = ["help", "catalog"] as const;
 export type CommandName = (typeof commandNamesList)[number];

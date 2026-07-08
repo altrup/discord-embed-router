@@ -1,11 +1,12 @@
 import { join } from "node:path";
-import { ActionRowBuilder, EmbedBuilder } from "discord.js";
+
+import type { Globals, Locals, Session } from "@routes/types";
 import {
 	RouteHandler,
 	RouteStringSelectMenuBuilder,
 	RouteStringSelectMenuOptionBuilder,
 } from "discord-embed-router";
-import type { Globals, Locals, Session } from "@routes/types";
+import { ActionRowBuilder, EmbedBuilder } from "discord.js";
 
 export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,

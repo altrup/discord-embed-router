@@ -1,9 +1,10 @@
-import { EmbedRouter } from "discord-embed-router";
-import type { Globals, Locals, Session } from "@routes/types";
-import { help } from "@routes/help";
 import { catalog } from "@routes/catalog";
 import { counter } from "@routes/counter";
+import { help } from "@routes/help";
+import type { Globals, Locals, Session } from "@routes/types";
 import { userInfo } from "@routes/user-info";
+import { EmbedRouter } from "discord-embed-router";
+
 import { timer } from "./timer";
 
 export const registerRoutes = (

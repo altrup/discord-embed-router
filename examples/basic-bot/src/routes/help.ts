@@ -1,11 +1,11 @@
+import type { Globals, Locals, Session } from "@routes/types";
+import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
 	ButtonStyle,
 	EmbedBuilder,
 } from "discord.js";
-import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
-import type { Globals, Locals, Session } from "@routes/types";
 
 export const help: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,
