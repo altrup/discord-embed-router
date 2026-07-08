@@ -4,10 +4,12 @@ import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
 export class RouteChannelSelectMenuBuilder<
-	L extends object,
+	Globals = unknown,
+	Session = unknown,
+	Locals = unknown,
 	P extends Path = Path,
 > extends ChannelSelectMenuBuilder {
-	#embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<Globals, Session, Locals>;
 
 	/**
 	 *
@@ -15,7 +17,7 @@ export class RouteChannelSelectMenuBuilder<
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
-		embedRouter: EmbedRouter<L>,
+		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<
 			ConstructorParameters<typeof ChannelSelectMenuBuilder>[0],
 			"customId"

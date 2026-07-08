@@ -17,6 +17,7 @@ import type {
 	SessionProvider,
 	LocalsProvider,
 	CleanupHandler,
+	Unused,
 } from "./types";
 import {
 	AnySelectMenuInteraction,
@@ -37,15 +38,12 @@ type EmbedRouterEvents = {
 };
 
 export class EmbedRouter<
-	Globals = unknown,
-	Session = unknown,
-	Locals = unknown,
+	Globals = Unused,
+	Session = Unused,
+	Locals = Unused,
 > extends EventEmitter<EmbedRouterEvents> {
 	// identifier -> embedRouter
-	static #usedIdentifiers = new Map<
-		string,
-		EmbedRouter<object, object, object>
-	>();
+	static #usedIdentifiers = new Map<string, EmbedRouter>();
 
 	// Not used after constructor, but stored to check if this router is capable of using RouteComponentBuilders
 	#client: Client | undefined;
@@ -195,10 +193,7 @@ export class EmbedRouter<
 
 			nameCollisions.push(collisionRouter);
 		}
-		EmbedRouter.#usedIdentifiers.set(
-			char,
-			this as unknown as EmbedRouter<object, object, object>,
-		);
+		EmbedRouter.#usedIdentifiers.set(char, this as unknown as EmbedRouter);
 
 		if (nameCollisions.length > 0 && this.#name.length > 0) {
 			process.emitWarning(
@@ -304,11 +299,7 @@ export class EmbedRouter<
 	 */
 	public use<P extends Path = Path>(
 		routePath: P,
-		embedRouter: EmbedRouter<
-			Partial<Globals>,
-			Partial<Session>,
-			Partial<Locals>
-		>,
+		embedRouter: EmbedRouter<Globals, Session, Locals>,
 	) {
 		const pathString = pathToString(routePath);
 		for (const [method, routes] of embedRouter.#routes) {

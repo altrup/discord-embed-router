@@ -21,9 +21,12 @@ export type State<
 	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
 };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare const UNUSED: unique symbol;
+export type Unused = typeof UNUSED;
 export type RouteResponse<Session> = InteractionEditReplyOptions &
 	(
-		| ({ cleanup?: undefined } & (unknown extends Session
+		| ({ cleanup?: undefined } & (Unused extends Session
 				? { timeout?: number }
 				: { timeout: number }))
 		| {

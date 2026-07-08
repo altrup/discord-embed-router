@@ -7,10 +7,12 @@ import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
 export class RouteStringSelectMenuOptionBuilder<
-	L extends object,
+	Globals = unknown,
+	Session = unknown,
+	Locals = unknown,
 	P extends Path = Path,
 > extends StringSelectMenuOptionBuilder {
-	#embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<Globals, Session, Locals>;
 
 	/**
 	 *
@@ -20,7 +22,7 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
-		embedRouter: EmbedRouter<L>,
+		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;

@@ -9,10 +9,12 @@ import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStri
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 export class RouteStringSelectMenuBuilder<
-	L extends object,
+	Globals = unknown,
+	Session = unknown,
+	Locals = unknown,
 	P extends Path = Path,
 > extends StringSelectMenuBuilder {
-	#embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<Globals, Session, Locals>;
 
 	/**
 	 *
@@ -22,11 +24,16 @@ export class RouteStringSelectMenuBuilder<
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
-		embedRouter: EmbedRouter<L>,
+		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<StringSelectMenuComponentData, "customId" | "options"> & {
 			pattern?: P | undefined;
 			patternOptions?: RouteOptions | undefined;
-			tos: readonly RouteStringSelectMenuOptionBuilder<L, P>[];
+			tos: readonly RouteStringSelectMenuOptionBuilder<
+				Globals,
+				Session,
+				Locals,
+				P
+			>[];
 		},
 	) {
 		const { pattern, patternOptions, tos, ...rest } = data ?? {};
@@ -87,7 +94,7 @@ export class RouteStringSelectMenuBuilder<
 	 */
 	public addTos(
 		...tos: RestOrArray<
-			| RouteStringSelectMenuOptionBuilder<L, P>
+			| RouteStringSelectMenuOptionBuilder<Globals, Session, Locals, P>
 			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
 		>
 	): this {
@@ -109,7 +116,7 @@ export class RouteStringSelectMenuBuilder<
 	 */
 	public setTos(
 		...tos: RestOrArray<
-			| RouteStringSelectMenuOptionBuilder<L>
+			| RouteStringSelectMenuOptionBuilder<Globals, Session, Locals>
 			| ConstructorParameters<typeof RouteStringSelectMenuOptionBuilder>[0]
 		>
 	): this {

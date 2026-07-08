@@ -4,10 +4,12 @@ import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
 export class RouteUserSelectMenuBuilder<
-	L extends object,
+	Globals = unknown,
+	Session = unknown,
+	Locals = unknown,
 	P extends Path = Path,
 > extends UserSelectMenuBuilder {
-	#embedRouter: EmbedRouter<L>;
+	#embedRouter: EmbedRouter<Globals, Session, Locals>;
 
 	/**
 	 *
@@ -15,7 +17,7 @@ export class RouteUserSelectMenuBuilder<
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
-		embedRouter: EmbedRouter<L>,
+		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<UserSelectMenuComponentData, "customId"> & {
 			pattern?: P | undefined;
 			patternOptions?: RouteOptions | undefined;
