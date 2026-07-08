@@ -3,6 +3,7 @@ import {
 	StringSelectMenuOptionBuilder,
 } from "discord.js";
 import { Path } from "path-to-regexp";
+
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 

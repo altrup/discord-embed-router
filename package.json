@@ -48,6 +48,7 @@
 	"type": "commonjs",
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
+		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"eslint": "^10.6.0",
 		"globals": "^17.7.0",
 		"jiti": "^2.7.0",

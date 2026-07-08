@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { Encoder } from "@encoding/Encoder";
 import { Method } from "@routing/types";
 import { ID_PREFIX } from "@src/consts";

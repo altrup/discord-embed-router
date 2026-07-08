@@ -3,7 +3,7 @@
 	// Mapped from https://www.typescriptlang.org/tsconfig
 	"compilerOptions": {
 		"ignoreDeprecations": "6.0",
-		
+
 		// File Layout
 		"rootDir": "src",
 		"paths": {
@@ -11,7 +11,7 @@
 			"@routing/*": ["./src/routing/*"],
 			"@encoding/*": ["./src/encoding/*"],
 			"@componentBuilders/*": ["./src/componentBuilders/*"],
-			"@helpers/*": ["./src/helpers/*"],
+			"@helpers/*": ["./src/helpers/*"]
 		},
 
 		// Type Checking

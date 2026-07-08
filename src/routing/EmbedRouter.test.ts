@@ -1,6 +1,8 @@
-import { vi, expect, test } from "vitest";
 import EventEmitter from "node:events";
+
 import { ButtonInteraction, Client } from "discord.js";
+import { expect, test, vi } from "vitest";
+
 import { EmbedRouter } from "@routing/EmbedRouter";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;

@@ -1,24 +1,7 @@
-import path from "node:path";
-import EventEmitter from "node:events";
 import { createHash } from "node:crypto";
-import { compile, match, MatchResult, Path } from "path-to-regexp";
-import type {
-	ApplyHandler,
-	CompiledRoute,
-	Method,
-	RouteHandler,
-	RouteResponse,
-	ExtractParams,
-	Args,
-	EventNames,
-	Listener,
-	RouteOptionsWithMethod,
-	CleanupReason,
-	SessionProvider,
-	LocalsProvider,
-	CleanupHandler,
-	Unused,
-} from "./types";
+import EventEmitter from "node:events";
+import path from "node:path";
+
 import {
 	AnySelectMenuInteraction,
 	ButtonInteraction,
@@ -28,10 +11,30 @@ import {
 	MessageFlags,
 	Snowflake,
 } from "discord.js";
-import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
-import { pathToString } from "@helpers/pathToString";
+import { compile, match, MatchResult, Path } from "path-to-regexp";
+
 import { Encoder } from "@encoding/Encoder";
 import { Location } from "@helpers/Location";
+import { pathToString } from "@helpers/pathToString";
+import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
+
+import type {
+	ApplyHandler,
+	Args,
+	CleanupHandler,
+	CleanupReason,
+	CompiledRoute,
+	EventNames,
+	ExtractParams,
+	Listener,
+	LocalsProvider,
+	Method,
+	RouteHandler,
+	RouteOptionsWithMethod,
+	RouteResponse,
+	SessionProvider,
+	Unused,
+} from "./types";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];

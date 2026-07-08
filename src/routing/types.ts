@@ -6,6 +6,7 @@ import {
 	Path,
 	TokenData,
 } from "path-to-regexp";
+
 import type { EmbedRouter } from "@routing/EmbedRouter";
 
 // EmbedRouter

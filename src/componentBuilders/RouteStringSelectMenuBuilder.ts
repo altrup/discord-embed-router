@@ -5,9 +5,11 @@ import {
 	StringSelectMenuComponentData,
 } from "discord.js";
 import { Path } from "path-to-regexp";
+
 import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
+
 export class RouteStringSelectMenuBuilder<
 	Globals = unknown,
 	Session = unknown,

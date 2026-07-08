@@ -1,5 +1,5 @@
-import type { Method } from "@routing/types";
 import type { MethodEncoding } from "@encoding/types";
+import type { Method } from "@routing/types";
 
 export const METHOD_ENCODINGS = ["G", "P", "U", "A", "D"] as const;
 
