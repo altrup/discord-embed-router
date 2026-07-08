@@ -47,6 +47,9 @@ export class EmbedRouter<
 		EmbedRouter<object, object, object>
 	>();
 
+	// Not used after constructor, but stored to check if this router is capable of using RouteComponentBuilders
+	#client: Client | undefined;
+
 	// Name used to generate prefixes
 	#name = "";
 	// Prefix for customIds of RouteButtonBuilders
@@ -119,7 +122,7 @@ export class EmbedRouter<
 	 * @param idPrefix the prefix for customIds
 	 */
 	constructor(
-		client: Client,
+		client?: Client | undefined,
 		{
 			name = "",
 			idPrefix = ID_PREFIX,
@@ -144,7 +147,8 @@ export class EmbedRouter<
 		this.#globals = globals;
 		this.#updateIdentifier();
 
-		client.on("interactionCreate", (interaction) =>
+		this.#client = client;
+		client?.on("interactionCreate", (interaction) =>
 			this.#listener(interaction),
 		);
 	}
@@ -681,6 +685,11 @@ export class EmbedRouter<
 			idPrefix?: string | undefined;
 		},
 	) {
+		if (!this.#client)
+			throw new Error(
+				`Cannot build a component customId for router "${this.#name || this.idPrefix}"; no client was passed to its constructor, so no interaction events are caught by the router`,
+			);
+
 		return this.#encoder.encodePath(path, {
 			idPrefix,
 			method,
