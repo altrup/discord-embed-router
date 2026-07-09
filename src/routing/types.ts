@@ -18,7 +18,10 @@ export type State<
 	P extends ParamData = ParamData,
 > = MatchResult<P> & {
 	globals?: Globals | undefined;
-	session?: Session | undefined;
+	getSession: () => Session | undefined;
+	hasSession: () => boolean;
+	setSession: (session: Session) => void;
+	deleteSession: () => boolean;
 	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
 };
@@ -28,8 +31,8 @@ export type Unused = typeof UNUSED;
 export type RouteResponse<Session> = InteractionEditReplyOptions &
 	(
 		| ({ cleanup?: undefined } & (Unused extends Session
-				? { timeout?: number }
-				: { timeout: number }))
+				? { timeout?: undefined }
+				: { timeout?: number }))
 		| {
 				cleanup: CleanupHandler;
 				timeout: number;

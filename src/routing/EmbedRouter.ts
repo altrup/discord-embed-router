@@ -8,6 +8,7 @@ import {
 	Client,
 	Interaction,
 	InteractionReplyOptions,
+	Message,
 	MessageFlags,
 	Snowflake,
 } from "discord.js";
@@ -16,8 +17,7 @@ import { compile, match, MatchResult, Path } from "path-to-regexp";
 import { Encoder } from "@encoding/Encoder";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
-import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
-
+import { ConfigError } from "@routing/ConfigError";
 import type {
 	ApplyHandler,
 	Args,
@@ -32,9 +32,9 @@ import type {
 	RouteHandler,
 	RouteOptionsWithMethod,
 	RouteResponse,
-	SessionProvider,
 	Unused,
-} from "./types";
+} from "@routing/types";
+import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
@@ -68,6 +68,7 @@ export class EmbedRouter<
 	#cleanups: Map<
 		Snowflake,
 		{
+			interaction: Interaction;
 			timeout: NodeJS.Timeout;
 			cleanupFn: CleanupHandler | undefined;
 			applyFn: ApplyHandler | undefined;
@@ -79,8 +80,12 @@ export class EmbedRouter<
 
 	// Persistant storage
 	#globals: Globals | undefined;
+	// message.id -> session
 	#sessions: Map<Snowflake, Session> = new Map();
-	#sessionProvider: undefined | SessionProvider<Globals, Session, Locals>;
+	// interaction.id -> session (used within an interaction)
+	#pendingSessions: Map<Snowflake, Session> = new Map();
+	// used to link an interaction to a message
+	#interactionToMessageId: Map<Snowflake, Snowflake> = new Map();
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
 
 	/**
@@ -101,23 +106,6 @@ export class EmbedRouter<
 	 */
 	public setGlobals(globals: Globals) {
 		this.#globals = globals;
-	}
-
-	/**
-	 * registers a session provider with this router
-	 *
-	 * @param sessionProvider the session provider to set
-	 */
-	public setSessionProvider(
-		sessionProvider: SessionProvider<Globals, Session, Locals>,
-	) {
-		this.#sessionProvider = sessionProvider;
-	}
-	/**
-	 * deletes the session provider on this router
-	 */
-	public deleteSessionProvider() {
-		this.#sessionProvider = undefined;
 	}
 
 	/**
@@ -159,10 +147,7 @@ export class EmbedRouter<
 		super();
 
 		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
-			throw new Error(`You can not have more than ${PUA_RANGE} routers`);
-		}
-		if (idPrefix.includes("/")) {
-			throw new Error(`Prefix can't contain "/": ${idPrefix}`);
+			throw new ConfigError(`You can not have more than ${PUA_RANGE} routers`);
 		}
 
 		this.#name = name;
@@ -343,76 +328,114 @@ export class EmbedRouter<
 			locals?: Locals | undefined;
 		} = {},
 	) {
-		if (!this.isSupportedInteraction(interaction))
-			throw new Error(
-				`Interactions type is not supported: ${interaction.type}`,
-			);
-
-		const session =
-			("message" in interaction
-				? this.#sessions.get(interaction.message.id)
-				: undefined) ?? this.#sessionProvider?.(this, interaction);
-		const routeResponse = await this.#resolve(path, {
-			interaction,
-			method,
-			session,
-			locals,
-		});
-		if (routeResponse === undefined) return;
-		if (routeResponse === false)
-			throw new Error(`No route found for ${pathToString(path, false)}`);
-
-		if (interaction.replied || interaction.deferred) {
-			if (flags)
+		let message: Message | undefined;
+		try {
+			if (!this.isSupportedInteraction(interaction))
 				throw new Error(
-					"You can only set flags for interactions that haven't been replied to",
+					`Interactions type is not supported: ${interaction.type}`,
 				);
-			if (routeResponse) await interaction.editReply(routeResponse);
-		} else if (!routeResponse) {
-			if ("deferUpdate" in interaction) {
-				await interaction.deferUpdate();
-			} else {
-				await interaction.deferReply();
+
+			message = "message" in interaction ? interaction.message : undefined;
+			if (message) {
+				this.#interactionToMessageId.set(interaction.id, message.id);
+
+				const session = this.#sessions.get(message.id);
+				if (session) this.#pendingSessions.set(interaction.id, session);
 			}
-		} else if ("update" in interaction) {
-			if (flags)
-				throw new Error(
-					"You can only set flags for interactions that haven't been replied to",
-				);
-			await interaction.update(routeResponse);
-		} else {
-			await interaction.reply({
-				...(routeResponse as InteractionReplyOptions),
-				flags,
+			const routeResponse = await this.#resolve(path, {
+				interaction,
+				method,
+				locals,
 			});
+			if (routeResponse === false)
+				throw new ConfigError(
+					`No route found for ${pathToString(path, false)}`,
+				);
+
+			if (interaction.replied || interaction.deferred) {
+				if (flags)
+					throw new ConfigError(
+						"You can only set flags for interactions that haven't been replied to",
+					);
+				if (routeResponse) await interaction.editReply(routeResponse);
+			} else if (routeResponse === undefined) {
+				if ("deferUpdate" in interaction) {
+					await interaction.deferUpdate();
+				} else {
+					await interaction.deferReply();
+				}
+			} else if ("update" in interaction) {
+				if (flags)
+					throw new ConfigError(
+						"You can only set flags for interactions that haven't been replied to",
+					);
+				await interaction.update(routeResponse);
+			} else {
+				await interaction.reply({
+					...(routeResponse as InteractionReplyOptions),
+					flags,
+				});
+			}
+
+			// Apply session and cleanup if needed
+			if (
+				(!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) &&
+				(routeResponse?.cleanup ||
+					this.#pendingSessions.get(interaction.id) ||
+					(message && this.#sessions.get(message.id)))
+			)
+				throw new ConfigError(
+					"Timeout is required for components using cleanups or sessions",
+				);
+			// Always start cleanup if timeout provided
+			if (!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) return;
+
+			message =
+				message ??
+				(await interaction.fetchReply().catch(() => {
+					throw new ConfigError(
+						"RouteResponse can only be undefined for interactions that already have messages",
+					);
+				}));
+			const resolvedMessage = message;
+
+			this.#interactionToMessageId.set(interaction.id, resolvedMessage.id);
+			const pendingSession = this.#pendingSessions.get(interaction.id);
+			this.#pendingSessions.delete(interaction.id);
+			if (pendingSession !== undefined) {
+				this.#sessions.set(resolvedMessage.id, pendingSession);
+			} else {
+				this.#sessions.delete(resolvedMessage.id);
+			}
+
+			const channel = interaction.channel;
+			const applyFn: ApplyHandler | undefined = resolvedMessage.flags.has(
+				MessageFlags.Ephemeral,
+			)
+				? interaction.editReply.bind(interaction)
+				: channel
+					? (options) => channel.messages.edit(resolvedMessage.id, options)
+					: undefined;
+			if (!applyFn)
+				process.emitWarning(
+					`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return results will not be applied to message.`,
+					"DiscordEmbedRouterWarning",
+				);
+
+			this.#addCleanup(resolvedMessage.id, {
+				interaction,
+				cleanupFn: routeResponse.cleanup?.bind(routeResponse),
+				applyFn,
+				timeout: routeResponse.timeout,
+			});
+		} finally {
+			if (!message || !this.#hasCleanup(message?.id)) {
+				// no cleanup was set, clear sessions
+				this.#interactionToMessageId.delete(interaction.id);
+				this.#pendingSessions.delete(interaction.id);
+				this.#sessions.delete(interaction.id);
+			}
 		}
-
-		// Apply session and cleanup if needed
-		if (!session && !routeResponse.cleanup) return;
-
-		const message = await interaction.fetchReply();
-		if (session) this.#sessions.set(message.id, session);
-
-		const channel = interaction.channel;
-		const applyFn: ApplyHandler | undefined = message.flags.has(
-			MessageFlags.Ephemeral,
-		)
-			? interaction.editReply.bind(interaction)
-			: channel
-				? (options) => channel.messages.edit(message.id, options)
-				: undefined;
-		if (!applyFn)
-			process.emitWarning(
-				`Could not derive applyFunction for ${pathToString(path, false)}. Cleanup return results will not be applied to message.`,
-				"DiscordEmbedRouterWarning",
-			);
-
-		this.#addCleanup(
-			message.id,
-			routeResponse.cleanup?.bind(routeResponse),
-			applyFn,
-			routeResponse.timeout,
-		);
 	}
 
 	/**
@@ -440,6 +463,7 @@ export class EmbedRouter<
 				locals: this.#localsProvider?.(this, interaction),
 			});
 		} catch (e: unknown) {
+			if (e instanceof ConfigError) throw e;
 			this.emit(
 				"routeError",
 				e instanceof Error ? e : new Error(String(e)),
@@ -598,15 +622,15 @@ export class EmbedRouter<
 		{
 			interaction,
 			method = "GET",
-			session,
 			locals,
 		}: {
 			interaction: Interaction;
 			method?: Method;
-			session: Session | undefined;
 			locals: Locals | undefined;
 		},
 	): Promise<RouteResponse<Session> | undefined | false> {
+		if (!this.isSupportedInteraction(interaction)) return false;
+
 		// don't check validity because query params are considered invalid
 		const pathString = pathToString(path, false);
 		const location = new Location(pathString);
@@ -617,7 +641,32 @@ export class EmbedRouter<
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
 					globals: this.#globals,
-					session,
+					getSession: this.#sessionFunction(
+						interaction,
+						(messageId: Snowflake) =>
+							structuredClone(this.#sessions.get(messageId)),
+						(interactionId: Snowflake) =>
+							structuredClone(this.#pendingSessions.get(interactionId)),
+					),
+					hasSession: this.#sessionFunction(
+						interaction,
+						this.#sessions.has.bind(this.#sessions),
+						this.#pendingSessions.has.bind(this.#pendingSessions),
+					),
+					deleteSession: this.#sessionFunction(
+						interaction,
+						this.#sessions.delete.bind(this.#sessions),
+						this.#pendingSessions.delete.bind(this.#pendingSessions),
+					),
+					setSession: this.#sessionFunction(
+						interaction,
+						(messageId: Snowflake, session: Session) => {
+							this.#sessions.set(messageId, session);
+						},
+						(interactionId: Snowflake, session: Session) => {
+							this.#pendingSessions.set(interactionId, session);
+						},
+					),
 					locals,
 				});
 			}
@@ -625,20 +674,46 @@ export class EmbedRouter<
 		return false;
 	}
 
+	// returns a function for sessions
+	#sessionFunction<F extends CallableFunction>(
+		interaction: Interaction,
+		messageFunction: F,
+		interactionFunction: F,
+	) {
+		return (...args: unknown[]) => {
+			const messageId = this.#interactionToMessageId.get(interaction.id);
+			if (messageId) {
+				if (!this.#hasCleanup(messageId))
+					throw new ConfigError(
+						"Timeout is required for components using cleanups or sessions",
+					);
+				return messageFunction(messageId, ...args);
+			}
+			return interactionFunction(interaction.id, ...args);
+		};
+	}
+
 	// Helpers for using and storing cleanup functions
+	// Runs previous cleanup if it exists
 	#addCleanup(
 		messageId: Snowflake,
-		cleanupFn: CleanupHandler | undefined,
-		applyFn: ApplyHandler | undefined,
-		timeout: number | undefined,
+		{
+			interaction,
+			cleanupFn,
+			applyFn,
+			timeout,
+		}: {
+			interaction: Interaction;
+			cleanupFn?: CleanupHandler | undefined;
+			applyFn?: ApplyHandler | undefined;
+			timeout: number;
+		},
 	) {
-		if (!timeout || !isFinite(timeout))
-			throw new Error(
-				"Timeout is required for components using cleanups or sessions",
-			);
+		if (this.#cleanups.has(messageId))
+			void this.#runCleanup(messageId, "interaction");
 
-		this.#removeCleanup(messageId);
 		this.#cleanups.set(messageId, {
+			interaction,
 			cleanupFn,
 			applyFn,
 			timeout: setTimeout(
@@ -649,11 +724,12 @@ export class EmbedRouter<
 	}
 
 	#removeCleanup(messageId: Snowflake) {
-		const cleanup = this.#cleanups.get(messageId);
-		if (!cleanup) return;
-
-		clearTimeout(cleanup.timeout);
+		clearTimeout(this.#cleanups.get(messageId)?.timeout);
 		this.#cleanups.delete(messageId);
+	}
+
+	#hasCleanup(messageId: Snowflake) {
+		return this.#cleanups.has(messageId);
 	}
 
 	async #runCleanup(messageId: Snowflake, reason: CleanupReason) {
@@ -662,6 +738,7 @@ export class EmbedRouter<
 
 		try {
 			this.#removeCleanup(messageId);
+			this.#interactionToMessageId.delete(cleanup.interaction.id);
 			if (reason === "timeout") {
 				this.#sessions.delete(messageId);
 			}
@@ -670,6 +747,7 @@ export class EmbedRouter<
 				await cleanup.applyFn?.(result).catch(console.error);
 			}
 		} catch (e: unknown) {
+			if (e instanceof ConfigError) throw e;
 			this.emit(
 				"routeError",
 				e instanceof Error ? e : new Error(String(e)),
@@ -700,7 +778,7 @@ export class EmbedRouter<
 		},
 	) {
 		if (!this.#client)
-			throw new Error(
+			throw new ConfigError(
 				`Cannot build a component customId for router "${this.#name || this.idPrefix}"; no client was passed to its constructor, so no interaction events are caught by the router`,
 			);
 
