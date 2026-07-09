@@ -337,8 +337,6 @@ export class EmbedRouter<
 
 			message = "message" in interaction ? interaction.message : undefined;
 			if (message) {
-				this.#interactionToMessageId.set(interaction.id, message.id);
-
 				const session = this.#sessions.get(message.id);
 				if (session) this.#pendingSessions.set(interaction.id, session);
 			}
