@@ -8,6 +8,7 @@ import {
 } from "path-to-regexp";
 
 import type { EmbedRouter } from "@routing/EmbedRouter";
+import type { CleanupHandler, SessionHandle } from "@sessions/types";
 
 // EmbedRouter
 
@@ -18,26 +19,24 @@ export type State<
 	P extends ParamData = ParamData,
 > = MatchResult<P> & {
 	globals?: Globals | undefined;
-	getSession: () => Session | undefined;
-	hasSession: () => boolean;
-	setSession: (session: Session) => void;
-	deleteSession: () => boolean;
+	session: SessionHandle<Session>;
 	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const UNUSED: unique symbol;
 export type Unused = typeof UNUSED;
-export type RouteResponse<Session> = InteractionEditReplyOptions &
-	(
-		| ({ cleanup?: undefined } & (Unused extends Session
-				? { timeout?: undefined }
-				: { timeout?: number }))
-		| {
-				cleanup: CleanupHandler;
-				timeout: number;
-		  }
-	);
+export type RouteResponse<Globals, Session, Locals> =
+	InteractionEditReplyOptions &
+		(
+			| ({ cleanup?: undefined } & (Unused extends Session
+					? { timeout?: undefined }
+					: { timeout?: number }))
+			| {
+					cleanup: CleanupHandler<Globals, Session, Locals>;
+					timeout: number;
+			  }
+		);
 export type RouteHandler<
 	M extends Method,
 	Globals,
@@ -49,20 +48,11 @@ export type RouteHandler<
 	interaction: Interaction,
 	state: State<Globals, Session, Locals, P>,
 ) => M extends "GET"
-	? Promise<RouteResponse<Session>> | RouteResponse<Session>
-	: | Promise<RouteResponse<Session> | undefined>
-		| RouteResponse<Session>
+	? | Promise<RouteResponse<Globals, Session, Locals>>
+		| RouteResponse<Globals, Session, Locals>
+	: | Promise<RouteResponse<Globals, Session, Locals> | undefined>
+		| RouteResponse<Globals, Session, Locals>
 		| undefined;
-export type CleanupReason = "timeout" | "interaction";
-export type CleanupHandler = (
-	reason: "timeout" | "interaction",
-) =>
-	| Promise<InteractionEditReplyOptions | undefined>
-	| InteractionEditReplyOptions
-	| undefined;
-export type ApplyHandler = (
-	options: string | InteractionEditReplyOptions,
-) => Promise<unknown>;
 export type SessionProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,

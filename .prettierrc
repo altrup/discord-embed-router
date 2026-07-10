@@ -6,7 +6,7 @@
 		"",
 		"<THIRD_PARTY_MODULES>",
 		"",
-		"^@(src|routing|encoding|componentBuilders|helpers)/",
+		"^@(src|routing|sessions|encoding|componentBuilders|helpers)/",
 		"",
 		"^[./]"
 	]

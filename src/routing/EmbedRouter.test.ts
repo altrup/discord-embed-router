@@ -20,7 +20,7 @@ const mockButtonInteraction = (
 		isButton: () => true,
 		isAnySelectMenu: () => false,
 		isChatInputCommand: () => false,
-		message: { id: "123456789" },
+		message: { id: "123456789", flags: { has: () => false } },
 		channel: null,
 		deferUpdate: vi.fn(),
 		deferReply: vi.fn(),
@@ -101,4 +101,172 @@ test("Router only listens for interactions with its prefix", async () => {
 
 	const [, , data] = handler.mock.calls[0]!;
 	expect(data.params).toEqual({ id: "3" });
+});
+
+test("dispatch throws a ConfigError if a route sets a session or cleanup without a finite timeout", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	embedRouter.get("/set", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return {};
+	});
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/set"),
+	).rejects.toThrow(
+		"Timeout is required for components using cleanups or sessions",
+	);
+});
+
+test("a session committed by one dispatch is seeded into a later dispatch on the same message", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	embedRouter.get("/set", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return { timeout: 5000 };
+	});
+
+	let seenSession: string | undefined;
+	embedRouter.get("/read", (_router, _interaction, state) => {
+		seenSession = state.session.get();
+		state.session.delete();
+		return {};
+	});
+
+	// same message.id by default, as if two clicks on the same embed
+	await embedRouter.dispatch(mockButtonInteraction(""), "/set");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/read");
+
+	expect(seenSession).toBe("hello");
+});
+
+test("taking over a message's cleanup runs the previous cleanupFn with the new dispatch's state, not undefined", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	const cleanupFn = vi.fn();
+	embedRouter.get("/a", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return { cleanup: cleanupFn, timeout: 5000 };
+	});
+	embedRouter.get("/b", (_router, _interaction, state) => {
+		// this dispatch doesn't want a session of its own
+		state.session.delete();
+		return {};
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/b");
+
+	expect(cleanupFn).toHaveBeenCalledOnce();
+	const [newState] = cleanupFn.mock.calls[0]!;
+	expect(newState).not.toBeUndefined();
+	expect(newState.path).toBe("/b");
+});
+
+test("cleanupFn's `this` is bound to the RouteResponse it was returned from", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	let boundToResponse = false;
+	const response = {
+		cleanup: function (this: unknown) {
+			boundToResponse = this === response;
+			return undefined;
+		},
+		timeout: 5000,
+	};
+	embedRouter.get("/a", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return response;
+	});
+	embedRouter.get("/b", (_router, _interaction, state) => {
+		state.session.delete();
+		return {};
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/b");
+
+	expect(boundToResponse).toBe(true);
+});
+
+test("a real timeout runs the cleanupFn with undefined, applies its result to the message, and clears the session", async () => {
+	vi.useFakeTimers();
+	try {
+		const client = mockClient();
+		const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+		const editMessage = vi.fn();
+		const cleanupFn = vi.fn().mockReturnValue({ content: "timed out" });
+		embedRouter.get("/a", (_router, _interaction, state) => {
+			state.session.set("hello");
+			return { cleanup: cleanupFn, timeout: 1000 };
+		});
+
+		const overrides = {
+			channel: { messages: { edit: editMessage } },
+		} as unknown as Partial<ButtonInteraction>;
+		await embedRouter.dispatch(mockButtonInteraction("", overrides), "/a");
+
+		await vi.advanceTimersByTimeAsync(1000);
+
+		expect(cleanupFn).toHaveBeenCalledExactlyOnceWith(undefined);
+		expect(editMessage).toHaveBeenCalledWith("123456789", {
+			content: "timed out",
+		});
+
+		// session was cleared by the real timeout, so a later dispatch that
+		// doesn't set its own session shouldn't see the stale one
+		let seenSession: string | undefined = "not read yet";
+		embedRouter.get("/read", (_router, _interaction, state) => {
+			seenSession = state.session.get();
+			return {};
+		});
+		await embedRouter.dispatch(mockButtonInteraction(""), "/read");
+		expect(seenSession).toBeUndefined();
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("a second interaction on a busy message is deferred immediately, then runs after the first finishes", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const order: string[] = [];
+	let resolveFirst!: () => void;
+	const firstStarted = new Promise<void>((resolve) => {
+		resolveFirst = resolve;
+	});
+
+	embedRouter.get("/first", async () => {
+		order.push("first-start");
+		resolveFirst();
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		order.push("first-end");
+		return {};
+	});
+	embedRouter.get("/second", () => {
+		order.push("second");
+		return {};
+	});
+
+	const first = mockButtonInteraction(
+		embedRouter.encodePath("/first", { method: "GET" }),
+	);
+	const second = mockButtonInteraction(
+		embedRouter.encodePath("/second", { method: "GET" }),
+	);
+
+	client.emit("interactionCreate", first);
+	await firstStarted;
+	client.emit("interactionCreate", second);
+
+	await vi.waitFor(() =>
+		expect(order).toEqual(["first-start", "first-end", "second"]),
+	);
+	expect(second.deferUpdate).toHaveBeenCalled();
 });

@@ -9,6 +9,7 @@
 		"paths": {
 			"@src/*": ["./src/*"],
 			"@routing/*": ["./src/routing/*"],
+			"@sessions/*": ["./src/sessions/*"],
 			"@encoding/*": ["./src/encoding/*"],
 			"@componentBuilders/*": ["./src/componentBuilders/*"],
 			"@helpers/*": ["./src/helpers/*"]

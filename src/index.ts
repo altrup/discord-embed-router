@@ -11,10 +11,10 @@ export type {
 	State,
 	RouteResponse,
 	RouteHandler,
-	CleanupReason,
-	CleanupHandler,
 	Method,
 	RouteOptions,
 	RouteOptionsWithMethod,
 	ExtractParams,
 } from "@routing/types";
+
+export type { SessionHandle, CleanupHandler } from "@sessions/types";

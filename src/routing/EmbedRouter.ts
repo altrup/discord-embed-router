@@ -3,26 +3,22 @@ import EventEmitter from "node:events";
 import path from "node:path";
 
 import {
-	AnySelectMenuInteraction,
-	ButtonInteraction,
 	Client,
 	Interaction,
 	InteractionReplyOptions,
 	Message,
 	MessageFlags,
-	Snowflake,
 } from "discord.js";
-import { compile, match, MatchResult, Path } from "path-to-regexp";
+import { match, MatchResult, Path } from "path-to-regexp";
 
 import { Encoder } from "@encoding/Encoder";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
-import { ConfigError } from "@routing/ConfigError";
+import { toError } from "@helpers/toError";
+import { InteractionDecoder } from "@routing/InteractionDecoder";
+import { MessageQueue } from "@routing/MessageQueue";
 import type {
-	ApplyHandler,
 	Args,
-	CleanupHandler,
-	CleanupReason,
 	CompiledRoute,
 	EventNames,
 	ExtractParams,
@@ -34,6 +30,10 @@ import type {
 	RouteResponse,
 	Unused,
 } from "@routing/types";
+import { CleanupManager } from "@sessions/CleanupManager";
+import { SessionManager } from "@sessions/SessionManager";
+import type { ApplyHandler, SessionHandle } from "@sessions/types";
+import { ConfigError } from "@src/ConfigError";
 import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
 
 type EmbedRouterEvents = {
@@ -64,28 +64,26 @@ export class EmbedRouter<
 	// All added routes
 	#routes: Map<Method, CompiledRoute<Method, Globals, Session, Locals>[]> =
 		new Map();
-	// message.id -> cleanup object
-	#cleanups: Map<
-		Snowflake,
-		{
-			interaction: Interaction;
-			timeout: NodeJS.Timeout;
-			cleanupFn: CleanupHandler | undefined;
-			applyFn: ApplyHandler | undefined;
-		}
-	> = new Map();
 
 	// Encoder for paths
 	#encoder: Encoder = new Encoder();
+	#interactionDecoder: InteractionDecoder = new InteractionDecoder(
+		this.#encoder,
+	);
 
 	// Persistant storage
 	#globals: Globals | undefined;
-	// message.id -> session
-	#sessions: Map<Snowflake, Session> = new Map();
-	// interaction.id -> session (used within an interaction)
-	#pendingSessions: Map<Snowflake, Session> = new Map();
-	// used to link an interaction to a message
-	#interactionToMessageId: Map<Snowflake, Snowflake> = new Map();
+
+	// Session storage and cleanup/timeout lifecycle for messages
+	#sessionManager: SessionManager<Session> = new SessionManager();
+	#cleanupManager: CleanupManager<Globals, Session, Locals> =
+		new CleanupManager(this.#sessionManager, (err, interaction) =>
+			this.emit("routeError", err, interaction),
+		);
+	// serializes dispatch per message, so concurrent interactions on the same
+	// message can't interleave their session reads/writes
+	#messageQueue: MessageQueue = new MessageQueue();
+
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
 
 	/**
@@ -336,14 +334,13 @@ export class EmbedRouter<
 				);
 
 			message = "message" in interaction ? interaction.message : undefined;
-			if (message) {
-				const session = this.#sessions.get(message.id);
-				if (session) this.#pendingSessions.set(interaction.id, session);
-			}
+			const session = this.#sessionManager.open(interaction, message?.id);
+
 			const routeResponse = await this.#resolve(path, {
 				interaction,
 				method,
 				locals,
+				session,
 			});
 			if (routeResponse === false)
 				throw new ConfigError(
@@ -378,9 +375,7 @@ export class EmbedRouter<
 			// Apply session and cleanup if needed
 			if (
 				(!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) &&
-				(routeResponse?.cleanup ||
-					this.#pendingSessions.get(interaction.id) ||
-					(message && this.#sessions.get(message.id)))
+				(routeResponse?.cleanup || session.has())
 			)
 				throw new ConfigError(
 					"Timeout is required for components using cleanups or sessions",
@@ -397,15 +392,6 @@ export class EmbedRouter<
 				}));
 			const resolvedMessage = message;
 
-			this.#interactionToMessageId.set(interaction.id, resolvedMessage.id);
-			const pendingSession = this.#pendingSessions.get(interaction.id);
-			this.#pendingSessions.delete(interaction.id);
-			if (pendingSession !== undefined) {
-				this.#sessions.set(resolvedMessage.id, pendingSession);
-			} else {
-				this.#sessions.delete(resolvedMessage.id);
-			}
-
 			const channel = interaction.channel;
 			const applyFn: ApplyHandler | undefined = resolvedMessage.flags.has(
 				MessageFlags.Ephemeral,
@@ -420,18 +406,17 @@ export class EmbedRouter<
 					"DiscordEmbedRouterWarning",
 				);
 
-			this.#addCleanup(resolvedMessage.id, {
+			this.#sessionManager.commit(interaction, resolvedMessage.id);
+			this.#cleanupManager.register(resolvedMessage.id, {
 				interaction,
 				cleanupFn: routeResponse.cleanup?.bind(routeResponse),
 				applyFn,
 				timeout: routeResponse.timeout,
 			});
 		} finally {
-			if (!message || !this.#hasCleanup(message?.id)) {
-				// no cleanup was set, clear sessions
-				this.#interactionToMessageId.delete(interaction.id);
-				this.#pendingSessions.delete(interaction.id);
-				this.#sessions.delete(interaction.id);
+			if (!message || !this.#cleanupManager.has(message.id)) {
+				// no cleanup was set, drop the working session copy
+				this.#sessionManager.discard(interaction);
 			}
 		}
 	}
@@ -450,23 +435,26 @@ export class EmbedRouter<
 				return;
 			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
 
-			await this.#runCleanup(interaction.message.id, "interaction");
+			const messageId = interaction.message.id;
+			// another interaction on this message is still being handled; ack
+			// immediately so this one doesn't blow its own 3s window while queued
+			if (this.#messageQueue.isBusy(messageId)) await interaction.deferUpdate();
 
-			const res = this.#decodeInteraction(interaction, this.idPrefix);
-			if (!res)
-				throw new Error(`Invalid component found: id ${interaction.customId}`);
+			await this.#messageQueue.run(messageId, async () => {
+				const res = this.#interactionDecoder.decode(interaction, this.idPrefix);
+				if (!res)
+					throw new Error(
+						`Invalid component found: id ${interaction.customId}`,
+					);
 
-			await this.dispatch(interaction, res.path, {
-				method: res.method,
-				locals: this.#localsProvider?.(this, interaction),
+				await this.dispatch(interaction, res.path, {
+					method: res.method,
+					locals: this.#localsProvider?.(this, interaction),
+				});
 			});
 		} catch (e: unknown) {
 			if (e instanceof ConfigError) throw e;
-			this.emit(
-				"routeError",
-				e instanceof Error ? e : new Error(String(e)),
-				interaction,
-			);
+			this.emit("routeError", toError(e), interaction);
 		}
 	}
 
@@ -477,133 +465,7 @@ export class EmbedRouter<
 	 * @returns if interaction is a supported type
 	 */
 	public isSupportedInteraction(interaction: Interaction) {
-		return (
-			interaction.isAnySelectMenu() ||
-			interaction.isButton() ||
-			interaction.isChatInputCommand()
-		);
-	}
-
-	/**
-	 * Decodes an interaction that came from a componentBuilder in this package
-	 *
-	 * @param interaction the interaction from Discord.js to decode
-	 * @param idPrefix string that the encoded path was prefixed with
-	 * @returns the method and path that was encoded from the interaction
-	 */
-	#decodeInteraction(
-		interaction: ButtonInteraction | AnySelectMenuInteraction,
-		idPrefix: string,
-	): { method: Method; path: string } | false {
-		const customId = interaction.customId;
-		if (!customId.startsWith(idPrefix)) return false;
-
-		const decodedPath = this.#encoder.decodePath(interaction.customId, {
-			idPrefix,
-		});
-		if (decodedPath === false) return false;
-
-		if (interaction.isButton()) {
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-				}).toString(),
-			};
-		} else if (interaction.isAnySelectMenu()) {
-			if (interaction.values.length === 0) return false;
-
-			if (interaction.isStringSelectMenu()) {
-				// also fill in variables for to's
-				const toLocations = interaction.values
-					.map((v) =>
-						this.#encoder.decodePath(v, {
-							idPrefix: "",
-							allowEmptyMethod: true,
-						}),
-					)
-					.filter((r) => r !== false)
-					.map((r) =>
-						this.#fillParams(r.path, {
-							ts: interaction.createdTimestamp.toString(),
-						}),
-					);
-				const pathLocation = this.#fillParams(
-					decodedPath.path,
-					{
-						ts: interaction.createdTimestamp.toString(),
-						to: toLocations[0]?.pathname.split("/").filter((s) => s.length > 0),
-						tos: toLocations
-							.map((l) => l.pathname.split("/"))
-							.flat()
-							.filter((s) => s.length > 0),
-					},
-					{
-						ts: interaction.createdTimestamp.toString(),
-						to: toLocations[0]?.pathname,
-						tos: toLocations.map((l) => l.pathname),
-					},
-				);
-
-				// merge query params
-				for (const toLocation of toLocations) {
-					for (const [key, value] of toLocation?.queryParams ?? []) {
-						pathLocation.queryParams.append(key, value);
-					}
-				}
-				return {
-					method: decodedPath.method,
-					path: pathLocation.toString(),
-				};
-			}
-
-			return {
-				method: decodedPath.method,
-				path: this.#fillParams(decodedPath.path, {
-					ts: interaction.createdTimestamp.toString(),
-					[interaction.isChannelSelectMenu()
-						? "channelId"
-						: interaction.isRoleSelectMenu()
-							? "roleId"
-							: "userId"]: interaction.values[0],
-					[interaction.isChannelSelectMenu()
-						? "channelIds"
-						: interaction.isRoleSelectMenu()
-							? "roleIds"
-							: "userIds"]: interaction.values,
-				}).toString(),
-			};
-		}
-
-		return false;
-	}
-
-	#fillParams(
-		path: string,
-		params: Partial<Record<string, string | string[]>> = {},
-		queryParams = params,
-	): Location {
-		const location = new Location(path);
-		const toPath = compile(location.pathname);
-
-		location.pathname = toPath(params);
-		for (const [key, value] of location.queryParams) {
-			if (
-				(value.startsWith(":") || value.startsWith("*")) &&
-				value.slice(1) in queryParams
-			) {
-				const paramValue = queryParams?.[value.slice(1)];
-				if (paramValue) {
-					location.queryParams.delete(key, value);
-					if (Array.isArray(paramValue))
-						paramValue.forEach((pv) => location.queryParams.append(key, pv));
-					else location.queryParams.append(key, paramValue);
-				} else {
-					location.queryParams.delete(key);
-				}
-			}
-		}
-		return location;
+		return interaction.isMessageComponent() || interaction.isChatInputCommand();
 	}
 
 	/**
@@ -613,6 +475,7 @@ export class EmbedRouter<
 	 * @param path path to route the interaction to
 	 * @param method method to send to route
 	 * @param locals additional info to pass in to page through state.local (optional)
+	 * @param session session handle already opened for this interaction
 	 * @returns discord message associated with route OR false
 	 */
 	async #resolve<P extends Path = Path>(
@@ -621,12 +484,14 @@ export class EmbedRouter<
 			interaction,
 			method = "GET",
 			locals,
+			session,
 		}: {
 			interaction: Interaction;
 			method?: Method;
 			locals: Locals | undefined;
+			session: SessionHandle<Session>;
 		},
-	): Promise<RouteResponse<Session> | undefined | false> {
+	): Promise<RouteResponse<Globals, Session, Locals> | undefined | false> {
 		if (!this.isSupportedInteraction(interaction)) return false;
 
 		// don't check validity because query params are considered invalid
@@ -635,123 +500,22 @@ export class EmbedRouter<
 		for (const route of this.#routes.get(method) ?? []) {
 			const result = route.matchFunction(location.pathname);
 			if (result) {
-				return await route.handler(this, interaction, {
+				const state = {
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
 					globals: this.#globals,
-					getSession: this.#sessionFunction(
-						interaction,
-						(messageId: Snowflake) =>
-							structuredClone(this.#sessions.get(messageId)),
-						(interactionId: Snowflake) =>
-							structuredClone(this.#pendingSessions.get(interactionId)),
-					),
-					hasSession: this.#sessionFunction(
-						interaction,
-						this.#sessions.has.bind(this.#sessions),
-						this.#pendingSessions.has.bind(this.#pendingSessions),
-					),
-					deleteSession: this.#sessionFunction(
-						interaction,
-						this.#sessions.delete.bind(this.#sessions),
-						this.#pendingSessions.delete.bind(this.#pendingSessions),
-					),
-					setSession: this.#sessionFunction(
-						interaction,
-						(messageId: Snowflake, session: Session) => {
-							this.#sessions.set(messageId, session);
-						},
-						(interactionId: Snowflake, session: Session) => {
-							this.#pendingSessions.set(interactionId, session);
-						},
-					),
+					session,
 					locals,
-				});
+				};
+
+				if (!interaction.isChatInputCommand()) {
+					await this.#cleanupManager.run(interaction.message.id, state);
+				}
+
+				return await route.handler(this, interaction, state);
 			}
 		}
 		return false;
-	}
-
-	// returns a function for sessions
-	#sessionFunction<F extends CallableFunction>(
-		interaction: Interaction,
-		messageFunction: F,
-		interactionFunction: F,
-	) {
-		return (...args: unknown[]) => {
-			const messageId = this.#interactionToMessageId.get(interaction.id);
-			if (messageId) {
-				if (!this.#hasCleanup(messageId))
-					throw new ConfigError(
-						"Timeout is required for components using cleanups or sessions",
-					);
-				return messageFunction(messageId, ...args);
-			}
-			return interactionFunction(interaction.id, ...args);
-		};
-	}
-
-	// Helpers for using and storing cleanup functions
-	// Runs previous cleanup if it exists
-	#addCleanup(
-		messageId: Snowflake,
-		{
-			interaction,
-			cleanupFn,
-			applyFn,
-			timeout,
-		}: {
-			interaction: Interaction;
-			cleanupFn?: CleanupHandler | undefined;
-			applyFn?: ApplyHandler | undefined;
-			timeout: number;
-		},
-	) {
-		if (this.#cleanups.has(messageId))
-			void this.#runCleanup(messageId, "interaction");
-
-		this.#cleanups.set(messageId, {
-			interaction,
-			cleanupFn,
-			applyFn,
-			timeout: setTimeout(
-				() => this.#runCleanup(messageId, "timeout"),
-				timeout,
-			),
-		});
-	}
-
-	#removeCleanup(messageId: Snowflake) {
-		clearTimeout(this.#cleanups.get(messageId)?.timeout);
-		this.#cleanups.delete(messageId);
-	}
-
-	#hasCleanup(messageId: Snowflake) {
-		return this.#cleanups.has(messageId);
-	}
-
-	async #runCleanup(messageId: Snowflake, reason: CleanupReason) {
-		const cleanup = this.#cleanups.get(messageId);
-		if (!cleanup) return;
-
-		try {
-			this.#removeCleanup(messageId);
-			this.#interactionToMessageId.delete(cleanup.interaction.id);
-			if (reason === "timeout") {
-				this.#sessions.delete(messageId);
-			}
-			const result = await cleanup?.cleanupFn?.(reason);
-			if (result && reason === "timeout") {
-				await cleanup.applyFn?.(result).catch(console.error);
-			}
-		} catch (e: unknown) {
-			if (e instanceof ConfigError) throw e;
-			this.emit(
-				"routeError",
-				e instanceof Error ? e : new Error(String(e)),
-				undefined,
-			);
-		}
 	}
 
 	/**
