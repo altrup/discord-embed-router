@@ -470,6 +470,7 @@ export class EmbedRouter<
 				cleanupFn: routeResponse.cleanup?.bind(routeResponse),
 				applyFn,
 				timeout: routeResponse.timeout,
+				route: { method, path: pathToString(path, false) },
 			});
 		} finally {
 			if (!message || !this.#cleanupManager.has(message.id)) {
@@ -485,6 +486,9 @@ export class EmbedRouter<
 	 * @param interaction interactions from "interactionCreate" (filter for ButtonInteractions)
 	 */
 	async #listener(interaction: Interaction) {
+		// set once decoding succeeds, so a wrapped error can name the route
+		// even though this interaction never went through a user's own call site
+		let route: { method: Method; path: string } | undefined;
 		try {
 			if (
 				!this.isSupportedInteraction(interaction) ||
@@ -506,6 +510,7 @@ export class EmbedRouter<
 					throw new Error(
 						`Invalid component found: id ${interaction.customId}`,
 					);
+				route = res;
 
 				await this.dispatch(interaction, res.path, {
 					method: res.method,
@@ -514,7 +519,16 @@ export class EmbedRouter<
 			});
 		} catch (e: unknown) {
 			if (e instanceof ConfigError) throw e;
-			this.emit("routeError", toError(e), interaction);
+			this.emit(
+				"routeError",
+				route
+					? new Error(
+							`Error while handling ${route.method} ${pathToString(route.path, false)}`,
+							{ cause: toError(e) },
+						)
+					: toError(e),
+				interaction,
+			);
 		}
 	}
 

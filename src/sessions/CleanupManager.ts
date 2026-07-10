@@ -1,7 +1,7 @@
 import type { Interaction, Snowflake } from "discord.js";
 
 import { toError } from "@helpers/toError";
-import type { State } from "@routing/types";
+import type { Method, State } from "@routing/types";
 import type { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler, CleanupHandler } from "@sessions/types";
 import { ConfigError } from "@src/ConfigError";
@@ -20,6 +20,9 @@ export class CleanupManager<Globals, Session, Locals> {
 			timer: NodeJS.Timeout;
 			cleanupFn: CleanupHandler<Globals, Session, Locals> | undefined;
 			applyFn: ApplyHandler | undefined;
+			// the route that registered this cleanup, so a late-firing error can
+			// still name its route even though nothing on the stack does anymore
+			route: { method: Method; path: string };
 		}
 	>();
 
@@ -51,30 +54,42 @@ export class CleanupManager<Globals, Session, Locals> {
 	 * doesn't leak.
 	 *
 	 * @param messageId the message to register a cleanup for
-	 * @param opts the interaction that triggered the response, its cleanup/apply handlers, and the timeout to run them after
+	 * @param interaction the interaction that triggered the response
+	 * @param cleanupFn the cleanup handler to run
+	 * @param applyFn the handler to apply cleanupFn's result to the message
+	 * @param timeout how long to wait before running the cleanup
+	 * @param route the method and path that registered this cleanup
 	 */
 	public register(
 		messageId: Snowflake,
-		opts: {
+		{
+			interaction,
+			cleanupFn,
+			applyFn,
+			timeout,
+			route,
+		}: {
 			interaction: Interaction;
 			cleanupFn: CleanupHandler<Globals, Session, Locals> | undefined;
 			applyFn: ApplyHandler | undefined;
 			timeout: number;
+			route: { method: Method; path: string };
 		},
 	) {
 		this.remove(messageId);
 
 		this.#cleanups.set(messageId, {
-			interaction: opts.interaction,
-			cleanupFn: opts.cleanupFn,
-			applyFn: opts.applyFn,
+			interaction,
+			cleanupFn,
+			applyFn,
+			route,
 			// nothing awaits this timer, so a rethrown ConfigError has no
 			// caller to catch it -- report instead of letting it go unhandled
 			timer: setTimeout(() => {
 				this.run(messageId, undefined).catch((e: unknown) =>
-					this.#onError(toError(e), opts.interaction),
+					this.#report(e, interaction, route),
 				);
-			}, opts.timeout),
+			}, timeout),
 		});
 	}
 
@@ -109,16 +124,26 @@ export class CleanupManager<Globals, Session, Locals> {
 
 		try {
 			const result = await cleanup.cleanupFn?.(newState);
-			if (result && isTimeout) {
-				await cleanup
-					.applyFn?.(result)
-					.catch((e: unknown) =>
-						this.#onError(toError(e), cleanup.interaction),
-					);
-			}
+			if (result && isTimeout) await cleanup.applyFn?.(result);
 		} catch (e: unknown) {
 			if (e instanceof ConfigError) throw e;
-			this.#onError(toError(e), cleanup.interaction);
+			this.#report(e, cleanup.interaction, cleanup.route);
 		}
+	}
+
+	// wraps with the route that registered the cleanup, since by the time a
+	// timeout or an applyFn rejection surfaces, nothing on the stack knows
+	// which route that was anymore
+	#report(
+		e: unknown,
+		interaction: Interaction,
+		route: { method: Method; path: string },
+	) {
+		this.#onError(
+			new Error(`Error while handling ${route.method} ${route.path}`, {
+				cause: toError(e),
+			}),
+			interaction,
+		);
 	}
 }

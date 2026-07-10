@@ -153,6 +153,32 @@ test("dispatch throws a ConfigError if a route sets a session or cleanup without
 	);
 });
 
+test("an error thrown by a handler is wrapped with the method and path when reported via routeError", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const original = new Error("boom");
+
+	embedRouter.get("/broken/:id", () => {
+		throw original;
+	});
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(
+			embedRouter.encodePath("/broken/5", { method: "GET" }),
+		),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+
+	const [error] = onError.mock.calls[0]!;
+	expect(error.message).toBe("Error while handling GET /broken/5");
+	expect(error.cause).toBe(original);
+});
+
 test("a session committed by one dispatch is seeded into a later dispatch on the same message", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
