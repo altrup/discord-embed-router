@@ -17,6 +17,7 @@ const mockButtonInteraction = (
 		replied: false,
 		deferred: false,
 		isAutocomplete: () => false,
+		isMessageComponent: () => true,
 		isButton: () => true,
 		isAnySelectMenu: () => false,
 		isChatInputCommand: () => false,
@@ -230,6 +231,102 @@ test("a real timeout runs the cleanupFn with undefined, applies its result to th
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+test("a route handler can redirect to another registered GET path, which renders instead", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const getHandler = vi.fn().mockReturnValue({ content: "item 5" });
+	embedRouter.get("/item/:id", getHandler);
+	embedRouter.delete("/item/:id", (_router, _interaction, state) => {
+		return { redirect: `/item/${state.params.id}` };
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item/5", {
+		method: "DELETE",
+	});
+
+	expect(getHandler).toHaveBeenCalledOnce();
+	const [, , state] = getHandler.mock.calls[0]!;
+	expect(state.params).toEqual({ id: "5" });
+});
+
+test("taking over a message's cleanup through a redirect uses the redirecting route's own state, not the target's", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	const cleanupFn = vi.fn();
+	embedRouter.get("/item/:id", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return { cleanup: cleanupFn, timeout: 5000 };
+	});
+	embedRouter.get("/items", () => ({}));
+	embedRouter.delete("/item/:id", (_router, _interaction, state) => {
+		state.session.delete();
+		return { redirect: "/items" };
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item/5");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item/5", {
+		method: "DELETE",
+	});
+
+	expect(cleanupFn).toHaveBeenCalledOnce();
+	const [newState] = cleanupFn.mock.calls[0]!;
+	expect(newState.path).toBe("/item/5");
+	expect(newState.params).toEqual({ id: "5" });
+});
+
+test("a route redirecting into another route doesn't preempt its own message's cleanup a second time", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	const cleanupFn = vi.fn();
+	embedRouter.get("/item/:id", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return { cleanup: cleanupFn, timeout: 5000 };
+	});
+	embedRouter.get("/items", () => ({}));
+	embedRouter.delete("/item/:id", (_router, _interaction, state) => {
+		state.session.delete();
+		return { redirect: "/items" };
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item/5");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item/5", {
+		method: "DELETE",
+	});
+
+	expect(cleanupFn).toHaveBeenCalledOnce();
+});
+
+test("a redirect chain longer than the hop limit throws instead of looping forever", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.get("/a", () => ({ redirect: "/b" }));
+	embedRouter.get("/b", () => ({ redirect: "/a" }));
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/a"),
+	).rejects.toThrow("Too many redirects");
+});
+
+test("a non-GET route handler returning content instead of a redirect throws, even past TypeScript", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	// only reachable by a JS caller (or an `as any`) bypassing the type
+	embedRouter.delete("/item/:id", (() => ({
+		content: "deleted",
+	})) as unknown as Parameters<typeof embedRouter.delete>[1]);
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/item/5", {
+			method: "DELETE",
+		}),
+	).rejects.toThrow("must return a redirect or undefined");
 });
 
 test("a second interaction on a busy message is deferred immediately, then runs after the first finishes", async () => {

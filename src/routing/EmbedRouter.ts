@@ -28,6 +28,7 @@ import type {
 	RouteHandler,
 	RouteOptionsWithMethod,
 	RouteResponse,
+	RouteResult,
 	Unused,
 } from "@routing/types";
 import { CleanupManager } from "@sessions/CleanupManager";
@@ -39,6 +40,9 @@ import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
 };
+
+// guards against a route handler that redirects into a cycle
+const MAX_REDIRECTS = 10;
 
 export class EmbedRouter<
 	Globals = Unused,
@@ -494,12 +498,26 @@ export class EmbedRouter<
 	): Promise<RouteResponse<Globals, Session, Locals> | undefined | false> {
 		if (!this.isSupportedInteraction(interaction)) return false;
 
-		// don't check validity because query params are considered invalid
-		const pathString = pathToString(path, false);
-		const location = new Location(pathString);
-		for (const route of this.#routes.get(method) ?? []) {
-			const result = route.matchFunction(location.pathname);
-			if (result) {
+		let currentPath: Path = path;
+		let currentMethod = method;
+
+		for (let hop = 0; ; hop++) {
+			if (hop >= MAX_REDIRECTS)
+				throw new ConfigError(
+					`Too many redirects while resolving ${pathToString(path, false)}`,
+				);
+
+			// don't check validity because query params are considered invalid
+			const pathString = pathToString(currentPath, false);
+			const location = new Location(pathString);
+
+			let routeResult: RouteResult<Globals, Session, Locals> | undefined;
+			let matched = false;
+			for (const route of this.#routes.get(currentMethod) ?? []) {
+				const result = route.matchFunction(location.pathname);
+				if (!result) continue;
+				matched = true;
+
 				const state = {
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
@@ -512,10 +530,25 @@ export class EmbedRouter<
 					await this.#cleanupManager.run(interaction.message.id, state);
 				}
 
-				return await route.handler(this, interaction, state);
+				routeResult = await route.handler(this, interaction, state);
+				break;
 			}
+			if (!matched) return false;
+
+			if (routeResult && "redirect" in routeResult) {
+				currentPath = routeResult.redirect;
+				currentMethod = "GET";
+				continue;
+			}
+
+			// catches a JS caller (or an `as any`) returning content from a non-GET handler
+			if (routeResult && currentMethod !== "GET")
+				throw new ConfigError(
+					`Route handler for ${currentMethod} ${pathToString(currentPath, false)} must return a redirect or undefined, not content`,
+				);
+
+			return routeResult;
 		}
-		return false;
 	}
 
 	/**

@@ -37,6 +37,12 @@ export type RouteResponse<Globals, Session, Locals> =
 					timeout: number;
 			  }
 		);
+// hands off rendering to another registered path, always resolved as a GET.
+// no cleanup/timeout here -- only a renderer should own those, so a redirect
+// that wants one set passes it via the target's path/query instead
+export type RedirectResult = { redirect: Path };
+export type RouteResult<Globals, Session, Locals> =
+	RedirectResult | RouteResponse<Globals, Session, Locals>;
 export type RouteHandler<
 	M extends Method,
 	Globals,
@@ -48,11 +54,10 @@ export type RouteHandler<
 	interaction: Interaction,
 	state: State<Globals, Session, Locals, P>,
 ) => M extends "GET"
-	? | Promise<RouteResponse<Globals, Session, Locals>>
-		| RouteResponse<Globals, Session, Locals>
-	: | Promise<RouteResponse<Globals, Session, Locals> | undefined>
-		| RouteResponse<Globals, Session, Locals>
-		| undefined;
+	? | Promise<RouteResult<Globals, Session, Locals>>
+		| RouteResult<Globals, Session, Locals>
+	: // non-GET routes only mutate -- redirect to a renderer, or ack silently
+		Promise<RedirectResult | undefined> | RedirectResult | undefined;
 export type SessionProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,

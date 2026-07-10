@@ -68,9 +68,8 @@ export class CleanupManager<Globals, Session, Locals> {
 			interaction: opts.interaction,
 			cleanupFn: opts.cleanupFn,
 			applyFn: opts.applyFn,
-			// unlike run() called from #resolve(), nothing awaits this timer, so
-			// there's no caller left to catch a rethrown ConfigError -- report it
-			// instead of letting it become an unhandled rejection
+			// nothing awaits this timer, so a rethrown ConfigError has no
+			// caller to catch it -- report instead of letting it go unhandled
 			timer: setTimeout(() => {
 				this.run(messageId, undefined).catch((e: unknown) =>
 					this.#onError(toError(e), opts.interaction),
