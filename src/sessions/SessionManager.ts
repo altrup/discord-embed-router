@@ -78,6 +78,27 @@ export class SessionManager<Session> {
 		this.#sessions.delete(messageId);
 	}
 
+	/**
+	 * Wraps a handle so reads pass through and writes throw, for handlers on
+	 * a path where nothing would ever commit a write (showing a modal).
+	 *
+	 * @param session the handle to wrap
+	 * @returns a handle whose set/delete throw a ConfigError
+	 */
+	public readOnly(session: SessionHandle<Session>): SessionHandle<Session> {
+		const write = () => {
+			throw new ConfigError(
+				"MODAL handlers can not write to the session; nothing is committed when showing a modal. Write it in the render offering the modal, or in the route processing its submission",
+			);
+		};
+		return {
+			get: () => session.get(),
+			has: () => session.has(),
+			set: write,
+			delete: write,
+		};
+	}
+
 	#handleFor(
 		store: Map<Snowflake, Session>,
 		id: Snowflake,

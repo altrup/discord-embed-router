@@ -25,9 +25,12 @@ import type {
 	Listener,
 	LocalsProvider,
 	Method,
+	ModalRender,
+	ModalResult,
 	RouteHandler,
+	RouteOptions,
 	RouteOptionsWithMethod,
-	RouteResponse,
+	RouteRender,
 	RouteResult,
 	Unused,
 } from "@routing/types";
@@ -282,6 +285,19 @@ export class EmbedRouter<
 	}
 
 	/**
+	 * Registers a path with the router
+	 *
+	 * @param routePath path to match with
+	 * @param handler function that builds the modal to show when a path is matched
+	 */
+	public modal<P extends Path = Path>(
+		routePath: P | P[],
+		handler: RouteHandler<"MODAL", Globals, Session, Locals, ExtractParams<P>>,
+	) {
+		this.#addRoute("MODAL", routePath, handler);
+	}
+
+	/**
 	 * Adds a subrouter to the router
 	 *
 	 * @param routePath path of the router
@@ -314,6 +330,7 @@ export class EmbedRouter<
 	 * @param interaction interaction to connect to
 	 * @param path path to route the interaction to
 	 * @param method method to send to route
+	 * @param query query params to merge into the path, same as encodePath's query option
 	 * @param flags discord flags to send with message (optional, only allowed on first reply)
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 */
@@ -322,10 +339,10 @@ export class EmbedRouter<
 		path: P,
 		{
 			method = "GET",
+			query,
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
-		}: {
-			method?: Method;
+		}: RouteOptions & {
 			flags?: InteractionReplyOptions["flags"] | undefined;
 			locals?: Locals | undefined;
 		} = {},
@@ -337,20 +354,55 @@ export class EmbedRouter<
 					`Interactions type is not supported: ${interaction.type}`,
 				);
 
-			message = "message" in interaction ? interaction.message : undefined;
+			// modal submits shown from a command have no message
+			message =
+				"message" in interaction
+					? (interaction.message ?? undefined)
+					: undefined;
 			const session = this.#sessionManager.open(interaction, message?.id);
 
-			const routeResponse = await this.#resolve(path, {
+			const pathWithQuery = new Location(
+				pathToString(path, false),
+				query,
+			).toString();
+			const resolved = await this.#resolve(pathWithQuery, {
 				interaction,
 				method,
 				locals,
 				session,
 			});
-			if (routeResponse === false)
-				throw new ConfigError(
-					`No route found for ${pathToString(path, false)}`,
-				);
+			if (resolved === false)
+				throw new ConfigError(`No route found for ${pathWithQuery}`);
 
+			if ("modal" in resolved) {
+				if (resolved.modal) {
+					if (flags)
+						throw new ConfigError("You can not set flags when showing a modal");
+					if (
+						interaction.replied ||
+						interaction.deferred ||
+						!("showModal" in interaction)
+					)
+						throw new ConfigError(
+							"Modals can only be shown from interactions that haven't been replied to or deferred, and that aren't modal submissions themselves",
+						);
+					await interaction.showModal(resolved.modal);
+				} else if (!interaction.replied && !interaction.deferred) {
+					// silent ack; same mechanics as an undefined render below
+					if ("deferUpdate" in interaction && message) {
+						await interaction.deferUpdate();
+					} else {
+						await interaction.deferReply();
+					}
+				}
+				// showing a modal never edits the message: the message's existing
+				// cleanup/timeout (and committed session) stay untouched, and the
+				// read-only working copy is dropped
+				this.#sessionManager.discard(interaction);
+				return;
+			}
+
+			const routeResponse = resolved.message;
 			if (interaction.replied || interaction.deferred) {
 				if (flags)
 					throw new ConfigError(
@@ -358,12 +410,14 @@ export class EmbedRouter<
 					);
 				if (routeResponse) await interaction.editReply(routeResponse);
 			} else if (routeResponse === undefined) {
-				if ("deferUpdate" in interaction) {
+				// update-style acks need a message to update; a modal submit
+				// shown from a command has none, so fall back to reply-style
+				if ("deferUpdate" in interaction && message) {
 					await interaction.deferUpdate();
 				} else {
 					await interaction.deferReply();
 				}
-			} else if ("update" in interaction) {
+			} else if ("update" in interaction && message) {
 				if (flags)
 					throw new ConfigError(
 						"You can only set flags for interactions that haven't been replied to",
@@ -391,7 +445,7 @@ export class EmbedRouter<
 				message ??
 				(await interaction.fetchReply().catch(() => {
 					throw new ConfigError(
-						"RouteResponse can only be undefined for interactions that already have messages",
+						"RouteRender can only be undefined for interactions that already have messages",
 					);
 				}));
 			const resolvedMessage = message;
@@ -439,7 +493,9 @@ export class EmbedRouter<
 				return;
 			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
 
-			const messageId = interaction.message.id;
+			// modal submits shown from a command have no message; key the queue by
+			// interaction so they don't contend with anything
+			const messageId = interaction.message?.id ?? interaction.id;
 			// another interaction on this message is still being handled; ack
 			// immediately so this one doesn't blow its own 3s window while queued
 			if (this.#messageQueue.isBusy(messageId)) await interaction.deferUpdate();
@@ -469,7 +525,11 @@ export class EmbedRouter<
 	 * @returns if interaction is a supported type
 	 */
 	public isSupportedInteraction(interaction: Interaction) {
-		return interaction.isMessageComponent() || interaction.isChatInputCommand();
+		return (
+			interaction.isMessageComponent() ||
+			interaction.isChatInputCommand() ||
+			interaction.isModalSubmit()
+		);
 	}
 
 	/**
@@ -495,7 +555,11 @@ export class EmbedRouter<
 			locals: Locals | undefined;
 			session: SessionHandle<Session>;
 		},
-	): Promise<RouteResponse<Globals, Session, Locals> | undefined | false> {
+	): Promise<
+		| { message: RouteRender<Globals, Session, Locals> | undefined }
+		| { modal: ModalRender<Globals, Session, Locals> | undefined }
+		| false
+	> {
 		if (!this.isSupportedInteraction(interaction)) return false;
 
 		let currentPath: Path = path;
@@ -511,7 +575,10 @@ export class EmbedRouter<
 			const pathString = pathToString(currentPath, false);
 			const location = new Location(pathString);
 
-			let routeResult: RouteResult<Globals, Session, Locals> | undefined;
+			let routeResult:
+				| RouteResult<Globals, Session, Locals>
+				| ModalResult<Globals, Session, Locals>
+				| undefined;
 			let matched = false;
 			for (const route of this.#routes.get(currentMethod) ?? []) {
 				const result = route.matchFunction(location.pathname);
@@ -522,12 +589,24 @@ export class EmbedRouter<
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
 					globals: this.#globals,
-					session,
 					locals,
+					fields: interaction.isModalSubmit() ? interaction.fields : undefined,
+					// MODAL handlers may read the session (e.g. to prefill inputs)
+					// but nothing commits on the showModal path, so writes throw
+					session:
+						currentMethod === "MODAL"
+							? this.#sessionManager.readOnly(session)
+							: session,
 				};
 
-				if (!interaction.isChatInputCommand()) {
-					await this.#cleanupManager.run(interaction.message.id, state);
+				// showing a modal never touches the message, so the previous
+				// render's cleanup is not preempted: it keeps running until the
+				// next non-MODAL dispatch or its own timeout
+				if (currentMethod !== "MODAL") {
+					const messageId =
+						"message" in interaction ? interaction.message?.id : undefined;
+					if (messageId !== undefined)
+						await this.#cleanupManager.run(messageId, state);
 				}
 
 				routeResult = await route.handler(this, interaction, state);
@@ -541,13 +620,35 @@ export class EmbedRouter<
 				continue;
 			}
 
+			// terminal results are tagged by kind (a modal payload is a plain
+			// object with no runtime discriminator, and each kind's undefined
+			// silent-ack takes a different path in dispatch)
+			if (currentMethod === "MODAL") {
+				// cleanup/timeout only make sense on a message render; catch them
+				// here so a JS caller doesn't have them silently dropped by showModal
+				if (
+					routeResult &&
+					("cleanup" in routeResult || "timeout" in routeResult)
+				)
+					throw new ConfigError(
+						`Route handler for MODAL ${pathToString(currentPath, false)} must not set cleanup or timeout; showing a modal never edits the message, so there is nothing for them to guard`,
+					);
+				return {
+					modal: routeResult as
+						ModalRender<Globals, Session, Locals> | undefined,
+				};
+			}
+
 			// catches a JS caller (or an `as any`) returning content from a non-GET handler
 			if (routeResult && currentMethod !== "GET")
 				throw new ConfigError(
 					`Route handler for ${currentMethod} ${pathToString(currentPath, false)} must return a redirect or undefined, not content`,
 				);
 
-			return routeResult;
+			return {
+				message: routeResult as
+					RouteRender<Globals, Session, Locals> | undefined,
+			};
 		}
 	}
 

@@ -1,7 +1,7 @@
 import type { MethodEncoding } from "@encoding/types";
 import type { Method } from "@routing/types";
 
-export const METHOD_ENCODINGS = ["G", "P", "U", "A", "D"] as const;
+export const METHOD_ENCODINGS = ["G", "P", "U", "A", "D", "M"] as const;
 
 export const METHOD_TO_ENCODING: Record<Method, MethodEncoding> = {
 	GET: "G",
@@ -9,6 +9,7 @@ export const METHOD_TO_ENCODING: Record<Method, MethodEncoding> = {
 	PUT: "U",
 	PATCH: "A",
 	DELETE: "D",
+	MODAL: "M",
 };
 export const ENCODING_TO_METHOD: Record<MethodEncoding, Method> = {
 	G: "GET",
@@ -16,4 +17,5 @@ export const ENCODING_TO_METHOD: Record<MethodEncoding, Method> = {
 	U: "PUT",
 	A: "PATCH",
 	D: "DELETE",
+	M: "MODAL",
 };

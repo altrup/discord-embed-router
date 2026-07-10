@@ -1,4 +1,8 @@
-import { AnySelectMenuInteraction, ButtonInteraction } from "discord.js";
+import {
+	AnySelectMenuInteraction,
+	ButtonInteraction,
+	ModalSubmitInteraction,
+} from "discord.js";
 import { expect, test } from "vitest";
 
 import { Encoder } from "@encoding/Encoder";
@@ -12,7 +16,18 @@ const mockButtonInteraction = (customId: string): ButtonInteraction =>
 		isMessageComponent: () => true,
 		isButton: () => true,
 		isAnySelectMenu: () => false,
+		isModalSubmit: () => false,
 	}) as unknown as ButtonInteraction;
+
+const mockModalSubmitInteraction = (customId: string): ModalSubmitInteraction =>
+	({
+		customId,
+		createdTimestamp: 1700000000000,
+		isMessageComponent: () => false,
+		isButton: () => false,
+		isAnySelectMenu: () => false,
+		isModalSubmit: () => true,
+	}) as unknown as ModalSubmitInteraction;
 
 const mockSelectMenuInteraction = (overrides: {
 	customId: string;
@@ -27,6 +42,7 @@ const mockSelectMenuInteraction = (overrides: {
 		isMessageComponent: () => true,
 		isButton: () => false,
 		isAnySelectMenu: () => true,
+		isModalSubmit: () => false,
 		isStringSelectMenu: () => false,
 		isChannelSelectMenu: () => false,
 		isRoleSelectMenu: () => false,
@@ -63,6 +79,23 @@ test("decode() decodes a button's customId and fills :ts from createdTimestamp",
 	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
 		method: "GET",
 		path: "/greet/1700000000000",
+	});
+});
+
+test("decode() decodes a modal submission's customId the same way as a button's", () => {
+	const encoder = new Encoder();
+	encoder.registerPath("/submit/:ts");
+	const customId = encoder.encodePath("/submit/:ts", {
+		method: "POST",
+		idPrefix: ID_PREFIX,
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockModalSubmitInteraction(customId);
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "POST",
+		path: "/submit/1700000000000",
 	});
 });
 

@@ -1,68 +1,62 @@
-import { ButtonBuilder } from "discord.js";
+import { ModalBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { DistributiveOmit } from "@helpers/types";
 import { EmbedRouter } from "@routing/EmbedRouter";
-import { RouteOptions } from "@routing/types";
+import { RouteOptionsWithMethod } from "@routing/types";
 
-export class RouteButtonBuilder<
+export class RouteModalBuilder<
 	Globals = unknown,
 	Session = unknown,
 	Locals = unknown,
 	P extends Path = Path,
-> extends ButtonBuilder {
+> extends ModalBuilder {
 	#embedRouter: EmbedRouter<Globals, Session, Locals>;
 
 	/**
 	 *
 	 * @param embedRouter the router you want to route with
-	 * @param data the data to construct a component out of
+	 * @param data the data to construct a modal out of
 	 */
 	constructor(
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: DistributiveOmit<
-			NonNullable<ConstructorParameters<typeof ButtonBuilder>[0]>,
-			"custom_id" | "customId" | "url"
+			NonNullable<ConstructorParameters<typeof ModalBuilder>[0]>,
+			"custom_id" | "customId"
 		> & {
 			to?: P | undefined;
-			toOptions?: RouteOptions | undefined;
+			toOptions?: RouteOptionsWithMethod | undefined;
 		},
 	) {
 		const { to, toOptions, ...rest } = data ?? {};
-		rejectKeys(rest, ["custom_id", "customId", "url"], "RouteButtonBuilder");
+		rejectKeys(rest, ["custom_id", "customId"], "RouteModalBuilder");
 		super(rest);
 
 		this.#embedRouter = embedRouter;
-		if (to) this.setTo(to, toOptions);
+		if (to) this.setTo(to, toOptions!);
 	}
 
 	/**
-	 * Not supported for RouteButtonBuilder
-	 *
-	 * @param
-	 */
-	override setURL(): this {
-		throw new Error("setURL is not supported on RouteButtonBuilder");
-	}
-
-	/**
-	 * Not supported for RouteButtonBuilder (use setTo)
+	 * Not supported for RouteModalBuilder (use setTo)
 	 *
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error("setCustomId is not supported on RouteButtonBuilder");
+		throw new Error(
+			"setCustomId is not supported on RouteModalBuilder; use setTo",
+		);
 	}
 
 	/**
-	 * Sets the path to route to when clicked
+	 * Sets the path the modal's submission routes to
 	 *
 	 * @param path the path to route to, can include :ts
+	 * @param method method to send to route; required because a submission's
+	 * target is wherever it gets processed, so there's no sane default
 	 * @param query any query parameters you want to add, can include :ts
-	 * @param method method to send to route
 	 */
-	public setTo(path: P, { method = "GET", query }: RouteOptions = {}): this {
+	public setTo(path: P, { method, query }: RouteOptionsWithMethod): this {
 		super.setCustomId(
 			this.#embedRouter.encodePath(path, {
 				method,

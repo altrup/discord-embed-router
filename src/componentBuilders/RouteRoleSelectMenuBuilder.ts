@@ -1,6 +1,8 @@
 import { RoleSelectMenuBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { rejectKeys } from "@componentBuilders/rejectKeys";
+import type { DistributiveOmit } from "@helpers/types";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
@@ -19,15 +21,16 @@ export class RouteRoleSelectMenuBuilder<
 	 */
 	constructor(
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
-		data?: Omit<
-			ConstructorParameters<typeof RoleSelectMenuBuilder>[0],
-			"customId"
+		data?: DistributiveOmit<
+			NonNullable<ConstructorParameters<typeof RoleSelectMenuBuilder>[0]>,
+			"customId" | "custom_id"
 		> & {
 			pattern?: P | undefined;
 			patternOptions?: RouteOptions | undefined;
 		},
 	) {
 		const { pattern, patternOptions, ...rest } = data ?? {};
+		rejectKeys(rest, ["custom_id", "customId"], "RouteRoleSelectMenuBuilder");
 		super(rest);
 
 		this.#embedRouter = embedRouter;

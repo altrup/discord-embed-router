@@ -1,6 +1,8 @@
 import { ChannelSelectMenuBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { rejectKeys } from "@componentBuilders/rejectKeys";
+import type { DistributiveOmit } from "@helpers/types";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
@@ -19,15 +21,20 @@ export class RouteChannelSelectMenuBuilder<
 	 */
 	constructor(
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
-		data?: Omit<
-			ConstructorParameters<typeof ChannelSelectMenuBuilder>[0],
-			"customId"
+		data?: DistributiveOmit<
+			NonNullable<ConstructorParameters<typeof ChannelSelectMenuBuilder>[0]>,
+			"customId" | "custom_id"
 		> & {
 			pattern?: P | undefined;
 			patternOptions?: RouteOptions | undefined;
 		},
 	) {
 		const { pattern, patternOptions, ...rest } = data ?? {};
+		rejectKeys(
+			rest,
+			["custom_id", "customId"],
+			"RouteChannelSelectMenuBuilder",
+		);
 		super(rest);
 
 		this.#embedRouter = embedRouter;

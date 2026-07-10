@@ -1,4 +1,9 @@
-import { Interaction, InteractionEditReplyOptions } from "discord.js";
+import {
+	Interaction,
+	InteractionEditReplyOptions,
+	ModalComponentData,
+	ModalSubmitFields,
+} from "discord.js";
 import {
 	MatchFunction,
 	MatchResult,
@@ -7,6 +12,7 @@ import {
 	TokenData,
 } from "path-to-regexp";
 
+import type { RouteModalBuilder } from "@componentBuilders/RouteModalBuilder";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import type { CleanupHandler, SessionHandle } from "@sessions/types";
 
@@ -22,11 +28,13 @@ export type State<
 	session: SessionHandle<Session>;
 	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
+	// submitted modal inputs; only set when the dispatch came from a ModalSubmitInteraction
+	fields?: ModalSubmitFields | undefined;
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const UNUSED: unique symbol;
 export type Unused = typeof UNUSED;
-export type RouteResponse<Globals, Session, Locals> =
+export type RouteRender<Globals, Session, Locals> =
 	InteractionEditReplyOptions &
 		(
 			| ({ cleanup?: undefined } & (Unused extends Session
@@ -38,11 +46,30 @@ export type RouteResponse<Globals, Session, Locals> =
 			  }
 		);
 // hands off rendering to another registered path, always resolved as a GET.
-// no cleanup/timeout here -- only a renderer should own those, so a redirect
+// no cleanup/timeout here: only a renderer should own those, so a redirect
 // that wants one set passes it via the target's path/query instead
-export type RedirectResult = { redirect: Path };
+export type RouteRedirect = { redirect: Path };
 export type RouteResult<Globals, Session, Locals> =
-	RedirectResult | RouteResponse<Globals, Session, Locals>;
+	RouteRedirect | RouteRender<Globals, Session, Locals>;
+// the modal to show; showModal() itself accepts either a builder or plain data
+export type ModalRender<Globals, Session, Locals> =
+	RouteModalBuilder<Globals, Session, Locals> | ModalComponentData;
+// no cleanup/timeout here: showing a modal never edits the message, so
+// there's nothing for a cleanup to preempt or a timeout to guard
+export type ModalResult<Globals, Session, Locals> =
+	ModalRender<Globals, Session, Locals> | RouteRedirect | undefined;
+// MODAL handlers get a read-only session (e.g. to prefill inputs from a
+// draft a render committed earlier): nothing commits on the showModal path,
+// so writes belong to the render that offers the modal or to the route that
+// processes its submission. set/delete throw a ConfigError at runtime
+export type ModalState<
+	Globals,
+	Session,
+	Locals,
+	P extends ParamData = ParamData,
+> = Omit<State<Globals, Session, Locals, P>, "session"> & {
+	session: Pick<SessionHandle<Session>, "get" | "has">;
+};
 export type RouteHandler<
 	M extends Method,
 	Globals,
@@ -52,12 +79,17 @@ export type RouteHandler<
 > = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,
-	state: State<Globals, Session, Locals, P>,
+	state: M extends "MODAL"
+		? ModalState<Globals, Session, Locals, P>
+		: State<Globals, Session, Locals, P>,
 ) => M extends "GET"
 	? | Promise<RouteResult<Globals, Session, Locals>>
 		| RouteResult<Globals, Session, Locals>
-	: // non-GET routes only mutate -- redirect to a renderer, or ack silently
-		Promise<RedirectResult | undefined> | RedirectResult | undefined;
+	: M extends "MODAL"
+		? | Promise<ModalResult<Globals, Session, Locals>>
+			| ModalResult<Globals, Session, Locals>
+		: // non-GET routes only mutate: redirect to a renderer, or ack silently
+			Promise<RouteRedirect | undefined> | RouteRedirect | undefined;
 export type SessionProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,
@@ -67,7 +99,7 @@ export type LocalsProvider<Globals, Session, Locals> = (
 	interaction: Interaction,
 ) => Locals;
 
-export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "MODAL";
 export type CompiledRoute<
 	M extends Method,
 	Globals,

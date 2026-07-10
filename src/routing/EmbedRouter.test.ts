@@ -1,6 +1,6 @@
 import EventEmitter from "node:events";
 
-import { ButtonInteraction, Client } from "discord.js";
+import { ButtonInteraction, Client, ModalSubmitInteraction } from "discord.js";
 import { expect, test, vi } from "vitest";
 
 import { EmbedRouter } from "@routing/EmbedRouter";
@@ -21,6 +21,39 @@ const mockButtonInteraction = (
 		isButton: () => true,
 		isAnySelectMenu: () => false,
 		isChatInputCommand: () => false,
+		isModalSubmit: () => false,
+		message: { id: "123456789", flags: { has: () => false } },
+		channel: null,
+		deferUpdate: vi.fn(),
+		deferReply: vi.fn(),
+		reply: vi.fn(),
+		editReply: vi.fn(),
+		update: vi.fn(),
+		showModal: vi.fn(),
+		fetchReply: vi
+			.fn()
+			.mockResolvedValue({ id: "123456789", flags: { has: () => false } }),
+		...overrides,
+	} as unknown as ButtonInteraction;
+};
+
+const mockModalSubmitInteraction = (
+	customId: string,
+	overrides: Partial<ModalSubmitInteraction> = {},
+): ModalSubmitInteraction => {
+	return {
+		customId,
+		id: "987654321",
+		createdTimestamp: Date.now(),
+		replied: false,
+		deferred: false,
+		isAutocomplete: () => false,
+		isMessageComponent: () => false,
+		isButton: () => false,
+		isAnySelectMenu: () => false,
+		isChatInputCommand: () => false,
+		isModalSubmit: () => true,
+		fields: { getTextInputValue: () => "typed value" },
 		message: { id: "123456789", flags: { has: () => false } },
 		channel: null,
 		deferUpdate: vi.fn(),
@@ -32,7 +65,7 @@ const mockButtonInteraction = (
 			.fn()
 			.mockResolvedValue({ id: "123456789", flags: { has: () => false } }),
 		...overrides,
-	} as unknown as ButtonInteraction;
+	} as unknown as ModalSubmitInteraction;
 };
 
 test("No id collisions", () => {
@@ -167,7 +200,7 @@ test("taking over a message's cleanup runs the previous cleanupFn with the new d
 	expect(newState.path).toBe("/b");
 });
 
-test("cleanupFn's `this` is bound to the RouteResponse it was returned from", async () => {
+test("cleanupFn's `this` is bound to the RouteRender it was returned from", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
 
@@ -366,4 +399,206 @@ test("a second interaction on a busy message is deferred immediately, then runs 
 		expect(order).toEqual(["first-start", "first-end", "second"]),
 	);
 	expect(second.deferUpdate).toHaveBeenCalled();
+});
+
+test("dispatch merges its query option into the path like encodePath does", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn().mockReturnValue({});
+	embedRouter.get("/test/:id", handler);
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/test/2?a=1", {
+		query: { b: "2" },
+	});
+
+	const [, , state] = handler.mock.calls[0]!;
+	expect(state.queryParams.get("a")).toBe("1");
+	expect(state.queryParams.get("b")).toBe("2");
+});
+
+test("a MODAL route's returned modal is shown instead of replying", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const modal = { customId: "raw", title: "Edit", components: [] };
+	embedRouter.modal("/edit/:id", () => modal);
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/edit/5", { method: "MODAL" });
+
+	expect(interaction.showModal).toHaveBeenCalledExactlyOnceWith(modal);
+	expect(interaction.reply).not.toHaveBeenCalled();
+	expect(interaction.update).not.toHaveBeenCalled();
+	expect(interaction.deferUpdate).not.toHaveBeenCalled();
+});
+
+test("a button encoded with method MODAL routes to the modal route through the listener", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const modal = { customId: "raw", title: "Edit", components: [] };
+	embedRouter.modal("/edit/:id", () => modal);
+
+	const interaction = mockButtonInteraction(
+		embedRouter.encodePath("/edit/5", { method: "MODAL" }),
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() =>
+		expect(interaction.showModal).toHaveBeenCalledExactlyOnceWith(modal),
+	);
+});
+
+test("a MODAL route can redirect to a GET renderer instead of showing a modal", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.modal("/edit/:id", () => ({ redirect: "/gone" }));
+	embedRouter.get("/gone", () => ({ content: "gone" }));
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/edit/5", { method: "MODAL" });
+
+	expect(interaction.showModal).not.toHaveBeenCalled();
+	expect(interaction.update).toHaveBeenCalledWith({ content: "gone" });
+});
+
+test("a MODAL handler returning undefined acks silently without showing a modal", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.modal("/edit", () => undefined);
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/edit", { method: "MODAL" });
+
+	expect(interaction.showModal).not.toHaveBeenCalled();
+	expect(interaction.deferUpdate).toHaveBeenCalledOnce();
+});
+
+test("a MODAL dispatch leaves the message's existing cleanup untouched", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	const cleanupFn = vi.fn();
+	embedRouter.get("/a", (_router, _interaction, state) => {
+		state.session.set("hello");
+		return { cleanup: cleanupFn, timeout: 5000 };
+	});
+	embedRouter.modal("/edit", () => ({
+		customId: "raw",
+		title: "Edit",
+		components: [],
+	}));
+	embedRouter.get("/b", (_router, _interaction, state) => {
+		state.session.delete();
+		return {};
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
+		method: "MODAL",
+	});
+	expect(cleanupFn).not.toHaveBeenCalled();
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/b");
+	expect(cleanupFn).toHaveBeenCalledOnce();
+});
+
+test("a MODAL handler can read the session committed by an earlier render", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	embedRouter.get("/a", (_router, _interaction, state) => {
+		state.session.set("draft");
+		return { timeout: 5000 };
+	});
+	let seenSession: string | undefined;
+	embedRouter.modal("/edit", (_router, _interaction, state) => {
+		seenSession = state.session.get();
+		return undefined;
+	});
+	let laterSession: string | undefined;
+	embedRouter.get("/b", (_router, _interaction, state) => {
+		laterSession = state.session.get();
+		state.session.delete();
+		return {};
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+	await embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
+		method: "MODAL",
+	});
+	expect(seenSession).toBe("draft");
+
+	// the read didn't consume or commit anything; the session is still there
+	await embedRouter.dispatch(mockButtonInteraction(""), "/b");
+	expect(laterSession).toBe("draft");
+});
+
+test("a MODAL handler writing to the session throws a ConfigError", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	embedRouter.modal("/edit", (_router, _interaction, state) => {
+		(state.session as unknown as { set(session: string): void }).set("nope");
+		return undefined;
+	});
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
+			method: "MODAL",
+		}),
+	).rejects.toThrow("MODAL handlers can not write to the session");
+});
+
+test("a MODAL route returning cleanup or timeout throws instead of silently dropping them", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	// only reachable by a JS caller (or an `as any`) bypassing the type
+	embedRouter.modal("/edit", (() => ({
+		customId: "raw",
+		title: "Edit",
+		components: [],
+		timeout: 5000,
+	})) as unknown as Parameters<typeof embedRouter.modal>[1]);
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
+			method: "MODAL",
+		}),
+	).rejects.toThrow("must not set cleanup or timeout");
+});
+
+test("a modal submission dispatches into an ordinary route with state.fields set", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn();
+	embedRouter.post("/submit/:id", handler);
+
+	const interaction = mockModalSubmitInteraction(
+		embedRouter.encodePath("/submit/7", { method: "POST" }),
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+	const [, , state] = handler.mock.calls[0]!;
+	expect(state.params).toEqual({ id: "7" });
+	expect(state.fields.getTextInputValue()).toBe("typed value");
+});
+
+test("state.fields is undefined for dispatches that aren't modal submissions", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn().mockReturnValue({});
+	embedRouter.get("/test", handler);
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/test");
+
+	const [, , state] = handler.mock.calls[0]!;
+	expect(state.fields).toBeUndefined();
 });

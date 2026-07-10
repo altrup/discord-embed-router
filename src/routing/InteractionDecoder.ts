@@ -6,9 +6,9 @@ import { Location } from "@helpers/Location";
 import type { Method } from "@routing/types";
 
 /**
- * Turns a discord.js component interaction that came from one of this
- * package's component builders back into `{ method, path }`, using the
- * given `Encoder` to decode the raw customId(s).
+ * Turns a discord.js component or modal submit interaction that came from one
+ * of this package's component builders back into `{ method, path }`, using
+ * the given `Encoder` to decode the raw customId(s).
  */
 export class InteractionDecoder {
 	#encoder: Encoder;
@@ -28,7 +28,8 @@ export class InteractionDecoder {
 		interaction: Interaction,
 		idPrefix: string,
 	): { method: Method; path: string } | false {
-		if (!interaction.isMessageComponent()) return false;
+		if (!interaction.isMessageComponent() && !interaction.isModalSubmit())
+			return false;
 
 		const customId = interaction.customId;
 		if (!customId.startsWith(idPrefix)) return false;
@@ -38,7 +39,7 @@ export class InteractionDecoder {
 		});
 		if (decodedPath === false) return false;
 
-		if (interaction.isButton()) {
+		if (interaction.isButton() || interaction.isModalSubmit()) {
 			return {
 				method: decodedPath.method,
 				path: this.#fillParams(decodedPath.path, {

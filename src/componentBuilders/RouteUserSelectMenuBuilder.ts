@@ -1,6 +1,7 @@
 import { UserSelectMenuBuilder, UserSelectMenuComponentData } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 
@@ -25,6 +26,7 @@ export class RouteUserSelectMenuBuilder<
 		},
 	) {
 		const { pattern, patternOptions, ...rest } = data ?? {};
+		rejectKeys(rest, ["custom_id", "customId"], "RouteUserSelectMenuBuilder");
 		super(rest);
 
 		this.#embedRouter = embedRouter;

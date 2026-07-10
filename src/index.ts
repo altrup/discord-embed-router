@@ -1,6 +1,7 @@
 export { EmbedRouter } from "@routing/EmbedRouter";
 
 export { RouteButtonBuilder } from "@componentBuilders/RouteButtonBuilder";
+export { RouteModalBuilder } from "@componentBuilders/RouteModalBuilder";
 export { RouteStringSelectMenuBuilder } from "@componentBuilders/RouteStringSelectMenuBuilder";
 export { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
 export { RouteChannelSelectMenuBuilder } from "@componentBuilders/RouteChannelSelectMenuBuilder";
@@ -9,7 +10,12 @@ export { RouteUserSelectMenuBuilder } from "@componentBuilders/RouteUserSelectMe
 
 export type {
 	State,
-	RouteResponse,
+	ModalState,
+	RouteRender,
+	RouteRedirect,
+	RouteResult,
+	ModalRender,
+	ModalResult,
 	RouteHandler,
 	Method,
 	RouteOptions,

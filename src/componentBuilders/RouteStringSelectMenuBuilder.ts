@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
@@ -39,6 +40,11 @@ export class RouteStringSelectMenuBuilder<
 		},
 	) {
 		const { pattern, patternOptions, tos, ...rest } = data ?? {};
+		rejectKeys(
+			rest,
+			["custom_id", "customId", "options"],
+			"RouteStringSelectMenuBuilder",
+		);
 		super(rest);
 
 		this.#embedRouter = embedRouter;
