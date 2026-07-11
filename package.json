@@ -47,6 +47,9 @@
 	"license": "MIT",
 	"author": "Eric Liu",
 	"type": "commonjs",
+	"workspaces": [
+		"examples/basic-bot"
+	],
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
