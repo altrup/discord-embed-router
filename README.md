@@ -29,11 +29,12 @@ import { EmbedRouter, RouteButtonBuilder } from "discord-embed-router";
 import { ActionRowBuilder, ButtonStyle, Client, EmbedBuilder } from "discord.js";
 
 const client = new Client({ intents: [] });
-const router = new EmbedRouter(client);
+const router = new EmbedRouter<undefined, number>(client);
 router.onError(console.error);
 
 router.get("/counter", (embedRouter, interaction, state) => {
-  const value = parseInt(state.queryParams.get("value") ?? "0");
+  const value = state.session.get() ?? 0;
+  state.session.set(value);
 
   return {
     embeds: [new EmbedBuilder().setTitle("Counter").setDescription(`${value}`)],
@@ -43,11 +44,19 @@ router.get("/counter", (embedRouter, interaction, state) => {
           new RouteButtonBuilder(embedRouter)
             .setLabel("+1")
             .setStyle(ButtonStyle.Success)
-            .setTo("/counter", { query: { value: `${value + 1}` } }),
+            .setTo("/counter/increment", { method: "POST" }),
         )
         .toJSON(),
     ],
+    // required whenever a route touches the session, so the router knows
+    // when to drop the stored count
+    timeout: 5 * 60 * 1000,
   };
+});
+
+router.post("/counter/increment", (_embedRouter, _interaction, state) => {
+  state.session.set((state.session.get() ?? 0) + 1);
+  return { redirect: "/counter" };
 });
 
 client.on("interactionCreate", async (interaction) => {
@@ -59,7 +68,7 @@ client.on("interactionCreate", async (interaction) => {
 client.login(process.env.DISCORD_TOKEN);
 ```
 
-Clicking "+1" fires an `interactionCreate` the router recognizes by its `customId` prefix, re-runs the `/counter` handler with the new `value`, and updates the message in place — no manual routing code needed.
+Clicking "+1" fires a `POST /counter/increment`, which mutates the count stored in the message's session and redirects to `GET /counter` to re-render. Storing the count in a session rather than baking it into the button's `customId` matters here: the router serializes dispatches per message, so a read-modify-write against the session can't race itself the way two rapid clicks would if each button's `customId` captured a stale value at render time (both clicks would send the same "value + 1" and one increment would be lost).
 
 See [`examples/basic-bot`](examples/basic-bot) for a full bot with multiple routes, a catalog page, and command wiring.
 
