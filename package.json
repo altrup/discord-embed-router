@@ -33,8 +33,10 @@
 		"build": "tsup",
 		"lint": "eslint",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"format": "prettier . --write",
+		"format:check": "prettier . --check",
 		"prepublishOnly": "npm run build"
 	},
 	"homepage": "https://github.com/altrup/discord-embed-router#readme",

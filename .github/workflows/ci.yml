@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      # Catches broken exports/types in the publishable artifact
+      - run: npx publint
+
+  example:
+    name: Example bot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The example consumes the package through its exports map
+      # (file:../..), so it only typechecks against a built dist
+      - run: npm run build
+
+      - run: npm run lint --workspace=basic-bot
+      - run: npm run format:check --workspace=basic-bot
+      - run: npm run typecheck --workspace=basic-bot
+      - run: npm run build --workspace=basic-bot
