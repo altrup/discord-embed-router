@@ -1,6 +1,6 @@
 {
 	"name": "discord-embed-router",
-	"version": "0.6.1",
+	"version": "0.6.2",
 	"description": "A vite inspired router for discord.js embeds and interactions",
 	"files": [
 		"dist"
