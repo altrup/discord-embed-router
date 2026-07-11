@@ -581,6 +581,30 @@ test("a redirect chain longer than the hop limit throws instead of looping forev
 	});
 });
 
+test("a redirect targeting a non-GET/MODAL method throws, even past TypeScript", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	// only reachable by a JS caller (or an `as any`) bypassing the type
+	embedRouter.get("/a", (() => ({
+		redirect: "/a",
+		method: "POST",
+	})) as unknown as Parameters<typeof embedRouter.get>[1]);
+	embedRouter.post("/a", () => {
+		throw new Error("should never be reached");
+	});
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/a"),
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining(
+				'A redirect can only target GET or MODAL, not "POST"',
+			),
+		},
+	});
+});
+
 test("dispatch() throws if called on an interaction that's still being dispatched", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);

@@ -747,6 +747,18 @@ export class EmbedRouter<
 						"cleanup and timeout are not supported in redirects",
 						{ method, path },
 					);
+				// only reachable by a JS caller (or an `as any`) bypassing the
+				// type: anything else would be calling another mutation, not
+				// handing off rendering
+				if (
+					routeResult.method !== undefined &&
+					routeResult.method !== "GET" &&
+					routeResult.method !== "MODAL"
+				)
+					throw new ConfigError(
+						`A redirect can only target GET or MODAL, not "${routeResult.method}"`,
+						{ method, path },
+					);
 				currentPath = routeResult.queryParams
 					? new Location(
 							pathToString(routeResult.redirect, false),
