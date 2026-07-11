@@ -9,11 +9,7 @@ import { RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
-export const ROUTE_ROLE_SELECT_MENU_BUILDER_PARAMS = [
-	":ts",
-	":roleId",
-	"*roleIds",
-] as const;
+export const ROUTE_ROLE_SELECT_MENU_BUILDER_PARAMS = [":ts", ":roleId"] as const;
 
 export class RouteRoleSelectMenuBuilder<
 	Globals = unknown,
@@ -60,8 +56,8 @@ export class RouteRoleSelectMenuBuilder<
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, can include :ts :roleId *roleIds
-	 * @param query any query parameters you want to add, can include :ts :roleId *roleIds
+	 * @param path the path to redirect to, can include :ts :roleId
+	 * @param query any query parameters you want to add, can include :ts :roleId
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {

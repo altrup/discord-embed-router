@@ -391,9 +391,11 @@ export class EmbedRouter<
 			query,
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
+			values,
 		}: RouteOptions<true> & {
 			flags?: InteractionReplyOptions["flags"] | undefined;
 			locals?: Locals | undefined;
+			values?: string[] | undefined;
 		} = {},
 	) {
 		let message: Message | undefined;
@@ -421,6 +423,7 @@ export class EmbedRouter<
 				interaction,
 				method,
 				locals,
+				values,
 			});
 			if (resolved === false)
 				throw new RouteNotFoundError(`No route found for ${pathWithQuery}`, {
@@ -591,6 +594,7 @@ export class EmbedRouter<
 				await this.dispatch(interaction, res.path, {
 					method: res.method,
 					locals: this.#localsProvider?.(this, interaction),
+					values: res.values,
 				});
 			});
 		} catch (e: unknown) {
@@ -641,10 +645,12 @@ export class EmbedRouter<
 			interaction,
 			method = "GET",
 			locals,
+			values,
 		}: {
 			interaction: Interaction;
 			method?: Method;
 			locals: Locals | undefined;
+			values?: string[] | undefined;
 		},
 	): Promise<
 		| { message: RouteRender<Globals, Session, Locals> | undefined }
@@ -683,6 +689,7 @@ export class EmbedRouter<
 					globals: this.#globals,
 					locals,
 					fields: interaction.isModalSubmit() ? interaction.fields : undefined,
+					values,
 				};
 
 				// showing a modal never touches the message, so the previous

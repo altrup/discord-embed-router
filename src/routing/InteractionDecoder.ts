@@ -27,7 +27,7 @@ export class InteractionDecoder {
 	public decode(
 		interaction: Interaction,
 		idPrefix: string,
-	): { method: Method; path: string } | false {
+	): { method: Method; path: string; values?: string[] } | false {
 		if (!interaction.isMessageComponent() && !interaction.isModalSubmit())
 			return false;
 
@@ -58,40 +58,38 @@ export class InteractionDecoder {
 						}),
 					)
 					.filter((r) => r !== false);
-				// also fill in variables for to's
 				const toLocations = decodedOptions.map((r) =>
 					this.#fillParams(r.path, {
 						ts: interaction.createdTimestamp.toString(),
 					}),
 				);
+				// only the first selected option drives :to/*to and the merged
+				// query params; every option's destination is still available
+				// via state.values for handlers that need the rest
+				const firstToLocation = toLocations[0];
 				const pathLocation = this.#fillParams(
 					decodedPath.path,
 					{
 						ts: interaction.createdTimestamp.toString(),
-						to: toLocations[0]?.pathname.split("/").filter((s) => s.length > 0),
-						tos: toLocations
-							.map((l) => l.pathname.split("/"))
-							.flat()
+						to: firstToLocation?.pathname
+							.split("/")
 							.filter((s) => s.length > 0),
 					},
 					{
 						ts: interaction.createdTimestamp.toString(),
-						to: toLocations[0]?.pathname,
-						tos: toLocations.map((l) => l.pathname),
+						to: firstToLocation?.pathname,
 					},
 				);
 
-				// merge query params
-				for (const toLocation of toLocations) {
-					for (const [key, value] of toLocation?.queryParams ?? []) {
-						pathLocation.queryParams.append(key, value);
-					}
+				for (const [key, value] of firstToLocation?.queryParams ?? []) {
+					pathLocation.queryParams.append(key, value);
 				}
 				return {
 					// an option can override the method for just that entry;
 					// otherwise fall back to the select menu's own pattern method
 					method: decodedOptions[0]?.method || decodedPath.method,
 					path: pathLocation.toString(),
+					values: toLocations.map((l) => l.toString()),
 				};
 			}
 
@@ -104,12 +102,8 @@ export class InteractionDecoder {
 						: interaction.isRoleSelectMenu()
 							? "roleId"
 							: "userId"]: interaction.values[0],
-					[interaction.isChannelSelectMenu()
-						? "channelIds"
-						: interaction.isRoleSelectMenu()
-							? "roleIds"
-							: "userIds"]: interaction.values,
 				}).toString(),
+				values: interaction.values,
 			};
 		}
 

@@ -14,11 +14,7 @@ import { RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
-export const ROUTE_STRING_SELECT_MENU_BUILDER_PARAMS = [
-	":ts",
-	"*to",
-	"*tos",
-] as const;
+export const ROUTE_STRING_SELECT_MENU_BUILDER_PARAMS = [":ts", "*to"] as const;
 
 export class RouteStringSelectMenuBuilder<
 	Globals = unknown,
@@ -151,8 +147,8 @@ export class RouteStringSelectMenuBuilder<
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, can include :ts *to *tos
-	 * @param query any query parameters you want to add, can include :ts *to *tos
+	 * @param path the path to redirect to, can include :ts *to
+	 * @param query any query parameters you want to add, can include :ts *to
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {

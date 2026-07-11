@@ -12,7 +12,6 @@ import { ConfigError } from "@src/ConfigError";
 export const ROUTE_CHANNEL_SELECT_MENU_BUILDER_PARAMS = [
 	":ts",
 	":channelId",
-	"*channelIds",
 ] as const;
 
 export class RouteChannelSelectMenuBuilder<
@@ -64,8 +63,8 @@ export class RouteChannelSelectMenuBuilder<
 	/**
 	 * Sets the pattern to redirect to (Required)
 	 *
-	 * @param path the path to redirect to, can include :ts :channelId *channelIds
-	 * @param query any query parameters you want to add, can include :ts :channelId *channelIds
+	 * @param path the path to redirect to, can include :ts :channelId
+	 * @param query any query parameters you want to add, can include :ts :channelId
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {

@@ -30,6 +30,9 @@ export type State<
 	queryParams: URLSearchParams;
 	// submitted modal inputs; only set when the dispatch came from a ModalSubmitInteraction
 	fields?: ModalSubmitFields | undefined;
+	// every selected value on a multi-select select menu; only :channelId/*to/
+	// etc. reflect the first, so handlers that need the rest read this instead
+	values?: string[] | undefined;
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const UNUSED: unique symbol;
