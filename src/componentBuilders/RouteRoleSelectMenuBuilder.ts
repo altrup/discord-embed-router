@@ -60,17 +60,17 @@ export class RouteRoleSelectMenuBuilder<
 	 * Sets the pattern to redirect to (Required)
 	 *
 	 * @param path the path to redirect to, can include :ts :roleId
-	 * @param query any query parameters you want to add, can include :ts :roleId
+	 * @param queryParams any query parameters you want to add, can include :ts :roleId
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
+	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteRoleSelectMenuBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;

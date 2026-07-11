@@ -64,17 +64,17 @@ export class RouteChannelSelectMenuBuilder<
 	 * Sets the pattern to redirect to (Required)
 	 *
 	 * @param path the path to redirect to, can include :ts :channelId
-	 * @param query any query parameters you want to add, can include :ts :channelId
+	 * @param queryParams any query parameters you want to add, can include :ts :channelId
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
+	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteChannelSelectMenuBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;

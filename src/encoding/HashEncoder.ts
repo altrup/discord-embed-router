@@ -97,7 +97,7 @@ export class HashEncoder extends Encoder {
 	 *
 	 * @param path raw unencoded path
 	 * @param method the html method to encode into the path
-	 * @param query any query params to include in the encoded string
+	 * @param queryParams any query params to include in the encoded string
 	 * @param idPrefix string to prefix the encoded path with
 	 * @returns the encoded string
 	 */
@@ -109,13 +109,13 @@ export class HashEncoder extends Encoder {
 		{
 			idPrefix,
 			method,
-			query,
+			queryParams,
 		}: RouteOptionsWithMethod<true, AllowEmptyMethod> & {
 			idPrefix: string;
 		},
 	) => {
 		// don't check validity; path may include query params
-		const location = new Location(pathToString(path, false), query);
+		const location = new Location(pathToString(path, false), queryParams);
 		location.tokens = this.#encodeTokens(location.tokens);
 
 		return `${idPrefix}${method === "" ? "" : METHOD_TO_ENCODING[method as Method]}${location.toString()}`;

@@ -621,7 +621,7 @@ test("a second interaction on a busy message is deferred immediately, then runs 
 	expect(second.deferUpdate).toHaveBeenCalled();
 });
 
-test("dispatch merges its query option into the path like encodePath does", async () => {
+test("dispatch merges its queryParams option into the path like encodePath does", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
 
@@ -629,7 +629,7 @@ test("dispatch merges its query option into the path like encodePath does", asyn
 	embedRouter.get("/test/:id", handler);
 
 	await embedRouter.dispatch(mockButtonInteraction(""), "/test/2?a=1", {
-		query: { b: "2" },
+		queryParams: { b: "2" },
 	});
 
 	const [, , state] = handler.mock.calls[0]!;

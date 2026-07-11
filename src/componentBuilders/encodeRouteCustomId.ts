@@ -10,9 +10,9 @@ export function encodeRouteCustomId<Globals, Session, Locals, P extends Path>(
 	builderName: string,
 	path: P,
 	method: unknown,
-	query: ConstructorParameters<typeof URLSearchParams>[0] | undefined,
+	queryParams: ConstructorParameters<typeof URLSearchParams>[0] | undefined,
 ): string {
 	if (!isMethod(method))
 		throw new ConfigError(`Invalid method "${method}" for ${builderName}`);
-	return embedRouter.encodePath(path, { method, query });
+	return embedRouter.encodePath(path, { method, queryParams });
 }

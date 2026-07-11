@@ -115,7 +115,7 @@ test("encoding a dynamic value containing a raw, unregistered PUA character thro
 		encoder.encodePath("/help/:id", {
 			method: "GET",
 			idPrefix: ID_PREFIX,
-			query: { id: String.fromCodePoint(PUA_START) },
+			queryParams: { id: String.fromCodePoint(PUA_START) },
 		}),
 	).not.toThrow();
 	// dynamic segments aren't run through the segment encoder, so a literal

@@ -27,7 +27,7 @@ export abstract class Encoder {
 	 *
 	 * @param path raw unencoded path
 	 * @param method the html method to encode into the path
-	 * @param query any query params to include in the encoded string
+	 * @param queryParams any query params to include in the encoded string
 	 * @param idPrefix string to prefix the encoded path with
 	 * @returns the encoded string
 	 */

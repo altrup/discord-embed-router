@@ -381,7 +381,7 @@ export class EmbedRouter<
 	 * @param interaction interaction to connect to
 	 * @param path path to route the interaction to
 	 * @param method method to send to route
-	 * @param query query params to merge into the path, same as encodePath's query option
+	 * @param queryParams query params to merge into the path, same as encodePath's queryParams option
 	 * @param flags discord flags to send with message (optional, only allowed on first reply)
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 */
@@ -390,7 +390,7 @@ export class EmbedRouter<
 		path: P,
 		{
 			method = "GET",
-			query,
+			queryParams,
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
 			values,
@@ -419,7 +419,7 @@ export class EmbedRouter<
 
 			const pathWithQuery = new Location(
 				pathToString(path, false),
-				query,
+				queryParams,
 			).toString();
 			const resolved = await this.#resolve(pathWithQuery, {
 				interaction,
@@ -776,7 +776,7 @@ export class EmbedRouter<
 	 *
 	 * @param path raw unencoded path
 	 * @param method the html method to encode into the path
-	 * @param query any query params to include in the encoded string
+	 * @param queryParams any query params to include in the encoded string
 	 * @param idPrefix string to prefix the encoded path with (optional, defaults to this router's prefix)
 	 * @returns
 	 */
@@ -789,7 +789,7 @@ export class EmbedRouter<
 		path: P,
 		{
 			method,
-			query,
+			queryParams,
 			idPrefix = this.idPrefix,
 		}: RouteOptionsWithMethod<AllowModalMethod, AllowEmptyMethod> & {
 			idPrefix?: string | undefined;
@@ -810,7 +810,7 @@ export class EmbedRouter<
 		return this.#encoder.encodePath(path, {
 			idPrefix,
 			method,
-			query,
+			queryParams,
 		});
 	}
 

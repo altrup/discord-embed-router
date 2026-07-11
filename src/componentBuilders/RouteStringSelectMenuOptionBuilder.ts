@@ -25,7 +25,7 @@ export class RouteStringSelectMenuOptionBuilder<
 	 *
 	 * @param embedRouter the router you want to route with
 	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 * @param queryParams any query parameters you want to add, :to will be replaced with the selected user's id
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
@@ -58,14 +58,14 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * Sets the path to route to when selected
 	 *
 	 * @param path the path to route to, can include :ts
-	 * @param query any query parameters you want to add, can include :ts
+	 * @param queryParams any query parameters you want to add, can include :ts
 	 * @param method method to send to route; defaults to empty, which defers
 	 * to whatever method the containing RouteStringSelectMenuBuilder's pattern
 	 * encodes. Set this to override the method for just this option.
 	 */
 	public setTo(
 		path: P,
-		{ method = "", query }: RouteOptions<false, true> = {},
+		{ method = "", queryParams }: RouteOptions<false, true> = {},
 	): this {
 		// only reachable by a JS caller (or an `as any`) bypassing the type
 		if (!isMethod(method, { allowEmpty: true }))
@@ -76,7 +76,7 @@ export class RouteStringSelectMenuOptionBuilder<
 			this.#embedRouter.encodePath<true, true>(path, {
 				idPrefix: "",
 				method: method,
-				query,
+				queryParams,
 			}),
 		);
 

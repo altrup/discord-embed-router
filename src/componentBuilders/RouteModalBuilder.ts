@@ -63,16 +63,16 @@ export class RouteModalBuilder<
 	 * @param path the path to route to, can include :ts
 	 * @param method method to send to route; required because a submission's
 	 * target is wherever it gets processed, so there's no sane default
-	 * @param query any query parameters you want to add, can include :ts
+	 * @param queryParams any query parameters you want to add, can include :ts
 	 */
-	public setTo(path: P, { method, query }: RouteOptionsWithMethod): this {
+	public setTo(path: P, { method, queryParams }: RouteOptionsWithMethod): this {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteModalBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;

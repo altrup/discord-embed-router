@@ -28,7 +28,7 @@ export class RouteStringSelectMenuBuilder<
 	 *
 	 * @param embedRouter the router you want to route with
 	 * @param path the path to redirect to, :to or *to in path will be replaced with the selected user's id
-	 * @param query any query parameters you want to add, :to will be replaced with the selected user's id
+	 * @param queryParams any query parameters you want to add, :to will be replaced with the selected user's id
 	 * @param data the data to construct a component out of
 	 */
 	constructor(
@@ -148,17 +148,17 @@ export class RouteStringSelectMenuBuilder<
 	 * Sets the pattern to redirect to (Required)
 	 *
 	 * @param path the path to redirect to, can include :ts *to
-	 * @param query any query parameters you want to add, can include :ts *to
+	 * @param queryParams any query parameters you want to add, can include :ts *to
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
+	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteStringSelectMenuBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;

@@ -136,7 +136,7 @@ export type RouteOptions<
 	method?:
 		| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
 		| (AllowEmptyMethod extends true ? "" : never);
-	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 export type RouteOptionsWithMethod<
 	AllowModalMethod extends boolean = false,
@@ -145,7 +145,7 @@ export type RouteOptionsWithMethod<
 	method:
 		| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
 		| (AllowEmptyMethod extends true ? "" : never);
-	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 
 // Param Extraction

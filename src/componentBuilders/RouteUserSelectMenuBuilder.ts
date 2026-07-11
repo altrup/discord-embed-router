@@ -56,17 +56,17 @@ export class RouteUserSelectMenuBuilder<
 	 * Sets the pattern to redirect to (Required)
 	 *
 	 * @param path the path to redirect to, can include :ts :userId
-	 * @param query any query parameters you want to add, can include :ts :userId
+	 * @param queryParams any query parameters you want to add, can include :ts :userId
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
+	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteUserSelectMenuBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;

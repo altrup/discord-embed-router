@@ -64,17 +64,17 @@ export class RouteButtonBuilder<
 	 * Sets the path to route to when clicked
 	 *
 	 * @param path the path to route to, can include :ts
-	 * @param query any query parameters you want to add, can include :ts
+	 * @param queryParams any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
-	public setTo(path: P, { method = "GET", query }: RouteOptions = {}): this {
+	public setTo(path: P, { method = "GET", queryParams }: RouteOptions = {}): this {
 		super.setCustomId(
 			encodeRouteCustomId(
 				this.#embedRouter,
 				"RouteButtonBuilder",
 				path,
 				method,
-				query,
+				queryParams,
 			),
 		);
 		return this;
