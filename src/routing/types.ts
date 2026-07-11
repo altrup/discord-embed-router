@@ -1,6 +1,8 @@
 import {
+	APIModalInteractionResponseCallbackData,
 	Interaction,
 	InteractionEditReplyOptions,
+	ModalBuilder,
 	ModalComponentData,
 	ModalSubmitFields,
 } from "discord.js";
@@ -56,7 +58,10 @@ export type RouteResult<Globals, Session, Locals> =
 	RouteRedirect | RouteRender<Globals, Session, Locals>;
 // the modal to show; showModal() itself accepts either a builder or plain data
 export type ModalRender<Globals, Session, Locals> =
-	RouteModalBuilder<Globals, Session, Locals> | ModalComponentData;
+	| RouteModalBuilder<Globals, Session, Locals>
+	| ModalBuilder
+	| ModalComponentData
+	| APIModalInteractionResponseCallbackData;
 // no cleanup/timeout here: showing a modal never edits the message, so
 // there's nothing for a cleanup to preempt or a timeout to guard
 export type ModalResult<Globals, Session, Locals> =
