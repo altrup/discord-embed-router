@@ -573,7 +573,6 @@ export class EmbedRouter<
 	async #listener(interaction: Interaction) {
 		// set once decoding succeeds, so a wrapped error can name the route
 		// even though this interaction never went through a user's own call site
-		let route: { method: Method; path: string } | undefined;
 		try {
 			// destroyed mid-flight (e.g. by a handler triggered from this same
 			// event loop turn); nothing left to dispatch to
@@ -593,17 +592,19 @@ export class EmbedRouter<
 			if (this.#messageQueue.isBusy(messageId)) await interaction.deferUpdate();
 
 			await this.#messageQueue.run(messageId, async () => {
-				const res = this.#interactionDecoder.decode(interaction, this.idPrefix);
-				if (!res)
+				const route = this.#interactionDecoder.decode(
+					interaction,
+					this.idPrefix,
+				);
+				if (!route)
 					throw new Error(
 						`Invalid component found: id ${interaction.customId}`,
 					);
-				route = res;
 
-				await this.dispatch(interaction, res.path, {
-					method: res.method,
+				await this.dispatch(interaction, route.path, {
+					method: route.method,
 					locals: this.#localsProvider?.(this, interaction),
-					values: res.values,
+					values: route.values,
 				});
 			});
 		} catch (e: unknown) {
@@ -611,18 +612,7 @@ export class EmbedRouter<
 			// instead of rethrown like other ConfigErrors
 			if (e instanceof ConfigError && !(e instanceof RouteNotFoundError))
 				throw e;
-			this.emit(
-				"routeError",
-				e instanceof RouteNotFoundError
-					? e
-					: route
-						? new Error(
-								`Error while handling ${route.method} ${pathToString(route.path, false)}`,
-								{ cause: toError(e) },
-							)
-						: toError(e),
-				interaction,
-			);
+			this.emit("routeError", toError(e), interaction);
 		}
 	}
 
