@@ -112,14 +112,14 @@ export class SessionManager<Session> {
 		};
 
 		return {
-			// cloned so handlers can't mutate stored session data without going through set()
 			get: () =>
 				guarded(() => {
 					const value = store.get(id);
 					return value === undefined ? undefined : structuredClone(value);
 				}),
 			has: () => guarded(() => store.has(id)),
-			set: (session: Session) => guarded(() => void store.set(id, session)),
+			set: (session: Session) =>
+				guarded(() => void store.set(id, structuredClone(session))),
 			delete: () => guarded(() => store.delete(id)),
 		};
 	}
