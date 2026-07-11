@@ -550,6 +550,13 @@ export class EmbedRouter<
 				timeout: routeResponse.timeout,
 				route: { method, path: pathToString(path, false) },
 			});
+		} catch (e: unknown) {
+			throw e instanceof ConfigError
+				? e
+				: new Error(
+						`Error while handling ${method} ${pathToString(path, false)}`,
+						{ cause: toError(e) },
+					);
 		} finally {
 			if (!message || !this.#cleanupManager.has(message.id)) {
 				// no cleanup was set, drop the working session copy
