@@ -30,6 +30,8 @@ export type State<
 	session: SessionHandle<Session>;
 	locals?: Locals | undefined;
 	queryParams: URLSearchParams;
+	// when Discord created the interaction, not when the router resolved it
+	timestamp: number;
 	// submitted modal inputs; only set when the dispatch came from a ModalSubmitInteraction
 	fields?: ModalSubmitFields | undefined;
 	// every selected value on a multi-select select menu; only :channelId/*to/

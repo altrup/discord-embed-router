@@ -15,6 +15,7 @@ const mockState = <Globals = undefined>(
 	path: "/next",
 	params: {},
 	queryParams: new URLSearchParams(),
+	timestamp: Date.now(),
 	globals: undefined as Globals,
 	locals: undefined,
 	session: new SessionManager<string>().open(

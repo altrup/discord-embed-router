@@ -175,6 +175,7 @@ export class RouteRegistry<Globals, Session, Locals> {
 				const state = {
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
+					timestamp: interaction.createdTimestamp,
 					globals: this.#getGlobals(),
 					locals,
 					fields: interaction.isModalSubmit() ? interaction.fields : undefined,
