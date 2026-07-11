@@ -600,18 +600,26 @@ test("dispatch() throws if called on an interaction that's still being dispatche
 	});
 });
 
-test("dispatch() called again on an interaction after it settles is allowed, e.g. from a setTimeout", async () => {
-	const client = mockClient();
-	const embedRouter = new EmbedRouter(client);
-	const interaction = mockButtonInteraction("");
+test("a handler's own setTimeout calling dispatch() on the same interaction works once the original dispatch has settled", async () => {
+	vi.useFakeTimers();
+	try {
+		const client = mockClient();
+		const embedRouter = new EmbedRouter(client);
+		const interaction = mockButtonInteraction("");
 
-	const handler = vi.fn().mockReturnValue({ content: "ok" });
-	embedRouter.get("/a", handler);
+		const handler = vi.fn().mockImplementation(() => {
+			setTimeout(() => void embedRouter.dispatch(interaction, "/a"), 500);
+			return { content: "ok" };
+		});
+		embedRouter.get("/a", handler);
 
-	await embedRouter.dispatch(interaction, "/a");
-	await embedRouter.dispatch(interaction, "/a");
+		await embedRouter.dispatch(interaction, "/a");
+		await vi.advanceTimersByTimeAsync(500);
 
-	expect(handler).toHaveBeenCalledTimes(2);
+		expect(handler).toHaveBeenCalledTimes(2);
+	} finally {
+		vi.useRealTimers();
+	}
 });
 
 test("a non-GET route handler returning content instead of a redirect throws, even past TypeScript", async () => {
