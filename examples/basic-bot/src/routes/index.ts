@@ -19,6 +19,8 @@ export const registerRoutes = (
 	catalogRouter.get("", catalog);
 	catalogRouter.get("/counter", counter.get);
 	catalogRouter.post("/counter", counter.post);
+	catalogRouter.put("/counter", counter.put);
+	catalogRouter.modal("/counter", counter.modal);
 	catalogRouter.get("/user-info", userInfo);
 	catalogRouter.get("/user-info/{:userId}", userInfo);
 	catalogRouter.get("/timer", timer);

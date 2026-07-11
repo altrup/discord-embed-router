@@ -37,7 +37,7 @@ function cellButton(
 		.setDisabled(value !== null || board.isOver || board.isComputerTurn)
 		.setTo(path, {
 			method: "POST",
-			query: { cell: `${index}` },
+			queryParams: { cell: `${index}` },
 		});
 }
 

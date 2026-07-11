@@ -47,7 +47,7 @@ export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 						.setStyle(ButtonStyle.Success)
 						.setDisabled(!isNaN(endTime))
 						.setTo(path, {
-							query: {
+							queryParams: {
 								startTime: ":ts",
 								dur: "30000",
 							},
