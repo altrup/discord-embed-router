@@ -121,12 +121,22 @@ export type CompiledRoute<
 	handler: RouteHandler<M, Globals, Session, Locals, P>;
 };
 
-export type RouteOptions<AllowModal extends boolean = false> = {
-	method?: AllowModal extends true ? Method : Exclude<Method, "MODAL">;
+export type RouteOptions<
+	AllowModalMethod extends boolean = false,
+	AllowEmptyMethod extends boolean = false,
+> = {
+	method?:
+		| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
+		| (AllowEmptyMethod extends true ? "" : never);
 	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
-export type RouteOptionsWithMethod<AllowEmptyMethod extends boolean = false> = {
-	method: AllowEmptyMethod extends false ? Method : Method | "";
+export type RouteOptionsWithMethod<
+	AllowModalMethod extends boolean = false,
+	AllowEmptyMethod extends boolean = false,
+> = {
+	method:
+		| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
+		| (AllowEmptyMethod extends true ? "" : never);
 	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 

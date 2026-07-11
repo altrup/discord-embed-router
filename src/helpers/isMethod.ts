@@ -1,9 +1,9 @@
 import { methodsList, type Method } from "@routing/types";
 
 /**
- * Runtime counterpart to RouteOptions<AllowModal>/RouteOptionsWithMethod
- * <AllowEmptyMethod>'s Method restrictions, for a JS caller (or an `as any`)
- * bypassing the type.
+ * Runtime counterpart to RouteOptions<AllowModalMethod>/RouteOptionsWithMethod
+ * <AllowModalMethod, AllowEmptyMethod>'s Method restrictions, for a JS caller
+ * (or an `as any`) bypassing the type.
  *
  * @param value the value to check
  * @param options.allowModal whether "MODAL" counts as valid; defaults to
@@ -13,17 +13,17 @@ import { methodsList, type Method } from "@routing/types";
  * @returns whether value is a valid Method
  */
 export const isMethod = <
-	AllowModal extends boolean = false,
-	AllowEmpty extends boolean = false,
+	AllowModalMethod extends boolean = false,
+	AllowEmptyMethod extends boolean = false,
 >(
 	value: unknown,
 	{
-		allowModal = false as AllowModal,
-		allowEmpty = false as AllowEmpty,
-	}: { allowModal?: AllowModal; allowEmpty?: AllowEmpty } = {},
+		allowModal = false as AllowModalMethod,
+		allowEmpty = false as AllowEmptyMethod,
+	}: { allowModal?: AllowModalMethod; allowEmpty?: AllowEmptyMethod } = {},
 ): value is
-	| (AllowModal extends true ? Method : Exclude<Method, "MODAL">)
-	| (AllowEmpty extends true ? "" : never) =>
+	| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
+	| (AllowEmptyMethod extends true ? "" : never) =>
 	(allowEmpty && value === "") ||
 	(typeof value === "string" &&
 		(methodsList as readonly string[]).includes(value) &&

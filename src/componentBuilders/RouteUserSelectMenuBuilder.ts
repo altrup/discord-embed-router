@@ -48,7 +48,7 @@ export class RouteUserSelectMenuBuilder<
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setCustomId is not supported on RouteUserSelectMenuBuilder",
 		);
 	}
@@ -67,7 +67,7 @@ export class RouteUserSelectMenuBuilder<
 				`Invalid method "${method}" for RouteUserSelectMenuBuilder`,
 			);
 		super.setCustomId(
-			this.#embedRouter.encodePath<true>(path, {
+			this.#embedRouter.encodePath(path, {
 				method,
 				query,
 			}),

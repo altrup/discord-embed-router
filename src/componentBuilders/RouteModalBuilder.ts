@@ -39,6 +39,8 @@ export class RouteModalBuilder<
 		super(rest);
 
 		this.#embedRouter = embedRouter;
+		if (to && !toOptions)
+			throw new ConfigError("toOptions is required when to is set for RouteModalBuilder");
 		if (to) this.setTo(to, toOptions!);
 	}
 
@@ -48,7 +50,7 @@ export class RouteModalBuilder<
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setCustomId is not supported on RouteModalBuilder; use setTo",
 		);
 	}
@@ -62,9 +64,7 @@ export class RouteModalBuilder<
 	 * @param query any query parameters you want to add, can include :ts
 	 */
 	public setTo(path: P, { method, query }: RouteOptionsWithMethod): this {
-		// only reachable by a JS caller (or an `as any`) bypassing the type;
-		// MODAL is excluded even though RouteOptionsWithMethod's type doesn't
-		// restrict it, since a modal submission can't itself trigger showModal
+		// only reachable by a JS caller (or an `as any`) bypassing the type
 		if (!isMethod(method))
 			throw new ConfigError(`Invalid method "${method}" for RouteModalBuilder`);
 		super.setCustomId(

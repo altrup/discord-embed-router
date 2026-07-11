@@ -27,8 +27,12 @@ export class Location {
 		queryParams?: ConstructorParameters<typeof URLSearchParams>[0],
 	) {
 		const url = new URL(location, BASE_URL);
+		// url.search is re-percent-encoded, so its length can't locate the
+		// boundary in the raw string; find it directly instead
+		const queryIndex = location.indexOf("?");
 
-		this.pathname = location.slice(0, location.length - url.search.length);
+		this.pathname =
+			queryIndex === -1 ? location : location.slice(0, queryIndex);
 		this.queryParams = url.searchParams;
 
 		if (queryParams) {

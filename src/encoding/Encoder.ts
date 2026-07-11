@@ -36,7 +36,10 @@ export abstract class Encoder {
 		P extends Path = Path,
 	>(
 		path: P,
-		options: RouteOptionsWithMethod<AllowEmptyMethod> & { idPrefix: string },
+		// always permits MODAL; excluding it is EmbedRouter's own concern
+		options: RouteOptionsWithMethod<true, AllowEmptyMethod> & {
+			idPrefix: string;
+		},
 	): string;
 
 	/**

@@ -148,8 +148,14 @@ test("decode() fills *tos on a string select menu from every chosen value", () =
 		method: "GET",
 		idPrefix: ID_PREFIX,
 	});
-	const valueA = encoder.encodePath<true>("/a", { method: "", idPrefix: "" });
-	const valueB = encoder.encodePath<true>("/b", { method: "", idPrefix: "" });
+	const valueA = encoder.encodePath<true>("/a", {
+		method: "",
+		idPrefix: "",
+	});
+	const valueB = encoder.encodePath<true>("/b", {
+		method: "",
+		idPrefix: "",
+	});
 
 	const decoder = new InteractionDecoder(encoder);
 	const interaction = mockSelectMenuInteraction({

@@ -40,7 +40,7 @@ import type {
 import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler } from "@sessions/types";
-import { ConfigError } from "@src/ConfigError";
+import { ConfigError, RouteNotFoundError } from "@src/ConfigError";
 import { ID_PREFIX, PUA_RANGE } from "@src/consts";
 
 type EmbedRouterEvents = {
@@ -389,7 +389,7 @@ export class EmbedRouter<
 				locals,
 			});
 			if (resolved === false)
-				throw new ConfigError(`No route found for ${pathWithQuery}`, {
+				throw new RouteNotFoundError(`No route found for ${pathWithQuery}`, {
 					method,
 					path,
 				});
@@ -468,7 +468,8 @@ export class EmbedRouter<
 
 			// Apply session and cleanup if needed
 			if (
-				(!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) &&
+				(routeResponse?.timeout === undefined ||
+					!isFinite(routeResponse.timeout)) &&
 				(routeResponse?.cleanup || this.#sessionManager.hasSession(interaction))
 			) {
 				this.#sessionManager.discard(interaction);
@@ -479,7 +480,10 @@ export class EmbedRouter<
 				);
 			}
 			// Always start cleanup if timeout provided
-			if (!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) {
+			if (
+				routeResponse?.timeout === undefined ||
+				!isFinite(routeResponse.timeout)
+			) {
 				// no timeout, close session
 				this.#sessionManager.discard(interaction);
 				this.#sessionManager.deleteForMessage(resolvedMessage.id);
@@ -553,7 +557,10 @@ export class EmbedRouter<
 				});
 			});
 		} catch (e: unknown) {
-			if (e instanceof ConfigError) throw e;
+			// a stale/forged customId isn't a misconfiguration, so it's reported
+			// instead of rethrown like other ConfigErrors
+			if (e instanceof ConfigError && !(e instanceof RouteNotFoundError))
+				throw e;
 			this.emit(
 				"routeError",
 				route
@@ -650,7 +657,7 @@ export class EmbedRouter<
 					if (oldInteraction) {
 						this.#sessionManager.persist(oldInteraction, messageId);
 					}
-					if (method !== "MODAL") {
+					if (currentMethod !== "MODAL") {
 						await this.#cleanupManager.run(messageId, {
 							...state,
 							// oldInteraction: session is committed in cleanup
@@ -729,6 +736,8 @@ export class EmbedRouter<
 	 * @returns
 	 */
 	public encodePath<
+		// defaults to true: the runtime check below always allows MODAL
+		AllowModalMethod extends boolean = true,
 		AllowEmptyMethod extends boolean = false,
 		P extends Path = Path,
 	>(
@@ -737,7 +746,7 @@ export class EmbedRouter<
 			method,
 			query,
 			idPrefix = this.idPrefix,
-		}: RouteOptionsWithMethod<AllowEmptyMethod> & {
+		}: RouteOptionsWithMethod<AllowModalMethod, AllowEmptyMethod> & {
 			idPrefix?: string | undefined;
 		},
 	) {

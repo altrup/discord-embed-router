@@ -27,3 +27,6 @@ export class ConfigError<P extends Path = Path> extends Error {
 		else super(message);
 	}
 }
+
+// a decoded method/path with no matching route; not necessarily a misconfiguration
+export class RouteNotFoundError<P extends Path = Path> extends ConfigError<P> {}

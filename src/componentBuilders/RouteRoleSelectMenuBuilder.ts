@@ -52,7 +52,7 @@ export class RouteRoleSelectMenuBuilder<
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setCustomId is not supported on RouteRoleSelectMenuBuilder",
 		);
 	}

@@ -77,7 +77,7 @@ export class RouteStringSelectMenuBuilder<
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setCustomId is not supported on RouteStringSelectMenuBuilder",
 		);
 	}
@@ -88,7 +88,7 @@ export class RouteStringSelectMenuBuilder<
 	 * @param
 	 */
 	override addOptions(): this {
-		throw new Error(
+		throw new ConfigError(
 			"addOptions is not supported on RouteStringSelectMenuBuilder",
 		);
 	}
@@ -99,7 +99,7 @@ export class RouteStringSelectMenuBuilder<
 	 * @param
 	 */
 	override setOptions(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setOptions is not supported on RouteStringSelectMenuBuilder",
 		);
 	}

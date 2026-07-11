@@ -48,7 +48,7 @@ export class RouteButtonBuilder<
 	 * @param
 	 */
 	override setURL(): this {
-		throw new Error("setURL is not supported on RouteButtonBuilder");
+		throw new ConfigError("setURL is not supported on RouteButtonBuilder");
 	}
 
 	/**
@@ -57,7 +57,7 @@ export class RouteButtonBuilder<
 	 * @param
 	 */
 	override setCustomId(): this {
-		throw new Error("setCustomId is not supported on RouteButtonBuilder");
+		throw new ConfigError("setCustomId is not supported on RouteButtonBuilder");
 	}
 
 	/**

@@ -810,7 +810,9 @@ test("a custom Encoder subclass passed to the constructor is used instead of the
 			P extends Path = Path,
 		>(
 			path: P,
-			options: RouteOptionsWithMethod<AllowEmptyMethod> & { idPrefix: string },
+			options: RouteOptionsWithMethod<true, AllowEmptyMethod> & {
+				idPrefix: string;
+			},
 		) {
 			return this.#inner.encodePath(path, options);
 		}

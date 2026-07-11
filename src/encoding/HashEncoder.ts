@@ -110,7 +110,7 @@ export class HashEncoder extends Encoder {
 			idPrefix,
 			method,
 			query,
-		}: RouteOptionsWithMethod<AllowEmptyMethod> & {
+		}: RouteOptionsWithMethod<true, AllowEmptyMethod> & {
 			idPrefix: string;
 		},
 	) => {
@@ -241,12 +241,21 @@ export class HashEncoder extends Encoder {
 					.flat();
 				decodedTokens.push(
 					...segments
-						.map((s) => parse(this.#encodingToSegment.get(s) ?? s).tokens)
+						.map((s) => parse(this.#decodeSegment(s)).tokens)
 						.flat(),
 				);
 			}
 		}
 		return decodedTokens;
+	}
+
+	// an unregistered PUA chunk means a forged or stale customId
+	#decodeSegment(segment: string): string {
+		const decoded = this.#encodingToSegment.get(segment);
+		if (decoded !== undefined) return decoded;
+		if (isPua(segment.codePointAt(0)!))
+			throw new Error(`Unregistered encoded segment "${segment}"`);
+		return segment;
 	}
 
 	// splits a piece of an encoded path into its original segments: text runs

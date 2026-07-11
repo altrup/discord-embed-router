@@ -5,8 +5,10 @@ import {
 import { Path } from "path-to-regexp";
 
 import { rejectKeys } from "@componentBuilders/rejectKeys";
+import { isMethod } from "@helpers/isMethod";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
+import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
 export const ROUTE_STRING_SELECT_MENU_OPTION_BUILDER_PARAMS = [":ts"] as const;
@@ -31,7 +33,7 @@ export class RouteStringSelectMenuOptionBuilder<
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;
-			toOptions?: RouteOptions | undefined;
+			toOptions?: RouteOptions<false, true> | undefined;
 		},
 	) {
 		const { to, toOptions, label, ...rest } = data ?? {};
@@ -47,7 +49,7 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * @param
 	 */
 	override setValue(): this {
-		throw new Error(
+		throw new ConfigError(
 			"setValue is not supported on RouteStringSelectMenuOptionBuilder",
 		);
 	}
@@ -61,11 +63,19 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * to whatever method the containing RouteStringSelectMenuBuilder's pattern
 	 * encodes. Set this to override the method for just this option.
 	 */
-	public setTo(path: P, { method, query }: RouteOptions = {}): this {
+	public setTo(
+		path: P,
+		{ method = "", query }: RouteOptions<false, true> = {},
+	): this {
+		// only reachable by a JS caller (or an `as any`) bypassing the type
+		if (!isMethod(method, { allowEmpty: true }))
+			throw new ConfigError(
+				`Invalid method "${method}" for RouteStringSelectMenuOptionBuilder`,
+			);
 		super.setValue(
-			this.#embedRouter.encodePath<true>(path, {
+			this.#embedRouter.encodePath<true, true>(path, {
 				idPrefix: "",
-				method: method ?? "",
+				method: method,
 				query,
 			}),
 		);
