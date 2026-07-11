@@ -100,8 +100,12 @@ export const ticTacToe: {
 					])
 					.toJSON(),
 			],
-			cleanup: () => {
+			cleanup: (newState) => {
 				if (computerMoveTimer) clearTimeout(computerMoveTimer);
+
+				if (newState && newState.path !== path) {
+					newState.session.delete();
+				}
 			},
 			timeout: DEFAULT_TIMEOUT,
 		};
