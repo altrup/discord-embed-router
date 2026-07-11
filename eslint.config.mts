@@ -1,6 +1,3 @@
-// outside tsconfig's rootDir, so VS Code's inferred project can't see
-// @types/node; ESLint itself type-checks this fine via its own
-// tsconfigRootDir/project resolution.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { fileURLToPath } from "node:url";
