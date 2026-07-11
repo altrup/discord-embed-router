@@ -8,7 +8,10 @@ import { RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
-export const ROUTE_USER_SELECT_MENU_BUILDER_PARAMS = [":ts", ":userId"] as const;
+export const ROUTE_USER_SELECT_MENU_BUILDER_PARAMS = [
+	":ts",
+	":userId",
+] as const;
 
 export class RouteUserSelectMenuBuilder<
 	Globals = unknown,

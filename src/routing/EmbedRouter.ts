@@ -102,7 +102,9 @@ export class EmbedRouter<
 	// router with no identifier/client/routes left
 	#assertAlive() {
 		if (this.#destroyed)
-			throw new ConfigError(`Router "${this.#name || this.idPrefix}" has been destroyed`);
+			throw new ConfigError(
+				`Router "${this.#name || this.idPrefix}" has been destroyed`,
+			);
 	}
 
 	/**
@@ -604,12 +606,14 @@ export class EmbedRouter<
 				throw e;
 			this.emit(
 				"routeError",
-				route
-					? new Error(
-							`Error while handling ${route.method} ${pathToString(route.path, false)}`,
-							{ cause: toError(e) },
-						)
-					: toError(e),
+				e instanceof RouteNotFoundError
+					? e
+					: route
+						? new Error(
+								`Error while handling ${route.method} ${pathToString(route.path, false)}`,
+								{ cause: toError(e) },
+							)
+						: toError(e),
 				interaction,
 			);
 		}
