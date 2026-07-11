@@ -93,6 +93,10 @@ export class EmbedRouter<
 	// serializes dispatch per message, so concurrent interactions on the same
 	// message can't interleave their session reads/writes
 	#messageQueue: MessageQueue = new MessageQueue();
+	// interactions currently mid-dispatch; catches a handler calling dispatch()
+	// on its own interaction (racing the response dispatch is about to send),
+	// which a redirect (including to MODAL) always replaces
+	#dispatchingInteractions: WeakSet<Interaction> = new WeakSet();
 
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
 
@@ -401,6 +405,12 @@ export class EmbedRouter<
 		} = {},
 	) {
 		let message: Message | undefined;
+		if (this.#dispatchingInteractions.has(interaction))
+			throw new ConfigError(
+				"Cannot dispatch() an interaction that's still being dispatched; return a redirect instead of calling dispatch() on your own interaction",
+				{ method, path },
+			);
+		this.#dispatchingInteractions.add(interaction);
 		try {
 			this.#assertAlive();
 			if (!this.isSupportedInteraction(interaction))
@@ -558,6 +568,7 @@ export class EmbedRouter<
 						{ cause: toError(e) },
 					);
 		} finally {
+			this.#dispatchingInteractions.delete(interaction);
 			if (!message || !this.#cleanupManager.has(message.id)) {
 				// no cleanup was set, drop the working session copy
 				this.#sessionManager.discard(interaction);
@@ -693,16 +704,18 @@ export class EmbedRouter<
 					values,
 				};
 
-				// showing a modal never touches the message, so the previous
-				// render's cleanup is not preempted: it keeps running until the
-				// next non-MODAL dispatch or its own timeout
+				// only a GET hop can produce (or replace) a render, so the
+				// previous render's cleanup is only preempted there: a MODAL
+				// never touches the message, and a mutation that doesn't
+				// redirect into a GET leaves the message, and its cleanup,
+				// untouched too
 				if (messageId !== undefined) {
 					const oldInteraction = this.#cleanupManager.interactionFor(messageId);
 
 					if (oldInteraction) {
 						this.#sessionManager.persist(oldInteraction, messageId);
 					}
-					if (currentMethod !== "MODAL") {
+					if (currentMethod === "GET") {
 						await this.#cleanupManager.run(messageId, {
 							...state,
 							// oldInteraction: session is committed in cleanup
@@ -740,7 +753,7 @@ export class EmbedRouter<
 							routeResult.queryParams,
 						).toString()
 					: routeResult.redirect;
-				currentMethod = "GET";
+				currentMethod = routeResult.method ?? "GET";
 				continue;
 			}
 
@@ -764,11 +777,14 @@ export class EmbedRouter<
 				};
 			}
 
-			if (routeResult && currentMethod !== "GET")
-				throw new ConfigError(
-					`Only GET route handlers can not return content`,
-					{ method, path },
-				);
+			// a redirect (the only valid non-GET result) already continued the
+			// loop above, so reaching here with a non-GET method means the
+			// handler returned content, or nothing at all
+			if (currentMethod !== "GET")
+				throw new ConfigError(`Non-GET route handlers must return a redirect`, {
+					method,
+					path,
+				});
 
 			return {
 				message: routeResult as

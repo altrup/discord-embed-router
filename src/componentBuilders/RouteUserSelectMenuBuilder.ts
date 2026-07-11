@@ -1,7 +1,6 @@
 import { UserSelectMenuBuilder, UserSelectMenuComponentData } from "discord.js";
 import { Path } from "path-to-regexp";
 
-import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
@@ -30,7 +29,7 @@ export class RouteUserSelectMenuBuilder<
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<UserSelectMenuComponentData, "customId"> & {
 			pattern?: P | undefined;
-			patternOptions?: RouteOptions | undefined;
+			patternOptions?: RouteOptions<true> | undefined;
 		},
 	) {
 		const { pattern, patternOptions, ...rest } = data ?? {};
@@ -59,15 +58,12 @@ export class RouteUserSelectMenuBuilder<
 	 * @param queryParams any query parameters you want to add, can include :ts :userId
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
+	public setPattern(
+		path: P,
+		{ method = "GET", queryParams }: RouteOptions<true> = {},
+	) {
 		super.setCustomId(
-			encodeRouteCustomId(
-				this.#embedRouter,
-				"RouteUserSelectMenuBuilder",
-				path,
-				method,
-				queryParams,
-			),
+			this.#embedRouter.encodePath(path, { method, queryParams }),
 		);
 		return this;
 	}

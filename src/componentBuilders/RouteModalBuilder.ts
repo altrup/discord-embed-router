@@ -1,8 +1,8 @@
 import { ModalBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
-import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
+import { isMethod } from "@helpers/isMethod";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptionsWithMethod } from "@routing/types";
@@ -66,14 +66,12 @@ export class RouteModalBuilder<
 	 * @param queryParams any query parameters you want to add, can include :ts
 	 */
 	public setTo(path: P, { method, queryParams }: RouteOptionsWithMethod): this {
+		// only reachable by a JS caller (or an `as any`) bypassing the type:
+		// discord.js has no showModal on ModalSubmitInteraction
+		if (!isMethod(method))
+			throw new ConfigError(`Invalid method "${method}" for RouteModalBuilder`);
 		super.setCustomId(
-			encodeRouteCustomId(
-				this.#embedRouter,
-				"RouteModalBuilder",
-				path,
-				method,
-				queryParams,
-			),
+			this.#embedRouter.encodePath(path, { method, queryParams }),
 		);
 		return this;
 	}

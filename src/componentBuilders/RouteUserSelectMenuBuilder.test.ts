@@ -5,17 +5,12 @@ import { expect, test } from "vitest";
 
 import { RouteUserSelectMenuBuilder } from "@componentBuilders/RouteUserSelectMenuBuilder";
 import { EmbedRouter } from "@routing/EmbedRouter";
-import { ConfigError } from "@src/ConfigError";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;
 
-test("setPattern throws a ConfigError for method MODAL, past TypeScript", () => {
+test("setPattern allows method MODAL", () => {
 	const embedRouter = new EmbedRouter(mockClient());
 	const menu = new RouteUserSelectMenuBuilder(embedRouter);
 
-	expect(() =>
-		menu.setPattern("/x", { method: "MODAL" } as unknown as Parameters<
-			typeof menu.setPattern
-		>[1]),
-	).toThrow(ConfigError);
+	expect(() => menu.setPattern("/x", { method: "MODAL" })).not.toThrow();
 });

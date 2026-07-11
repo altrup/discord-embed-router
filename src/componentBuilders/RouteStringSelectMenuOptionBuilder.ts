@@ -33,7 +33,7 @@ export class RouteStringSelectMenuOptionBuilder<
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;
-			toOptions?: RouteOptions<false, true> | undefined;
+			toOptions?: RouteOptions<true, true> | undefined;
 		},
 	) {
 		const { to, toOptions, label, ...rest } = data ?? {};
@@ -65,10 +65,10 @@ export class RouteStringSelectMenuOptionBuilder<
 	 */
 	public setTo(
 		path: P,
-		{ method = "", queryParams }: RouteOptions<false, true> = {},
+		{ method = "", queryParams }: RouteOptions<true, true> = {},
 	): this {
 		// only reachable by a JS caller (or an `as any`) bypassing the type
-		if (!isMethod(method, { allowEmpty: true }))
+		if (!isMethod(method, { allowModal: true, allowEmpty: true }))
 			throw new ConfigError(
 				`Invalid method "${method}" for RouteStringSelectMenuOptionBuilder`,
 			);

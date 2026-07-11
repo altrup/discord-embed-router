@@ -50,11 +50,14 @@ export type RouteRender<Globals, Session, Locals> =
 					timeout: number;
 			  }
 		);
-// hands off rendering to another registered path, always resolved as a GET.
+// hands off rendering to another registered path, resolved as GET by default.
 // no cleanup/timeout here: only a renderer should own those, so a redirect
 // that wants one set passes it via the target's path/queryParams instead
 export type RouteRedirect = {
 	redirect: Path;
+	// only GET (render) and MODAL (show) are sane redirect targets; anything
+	// else would just be calling another mutation, not handing off rendering
+	method?: Extract<Method, "GET" | "MODAL">;
 	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 export type RouteResult<Globals, Session, Locals> =
@@ -99,8 +102,9 @@ export type RouteHandler<
 	: M extends "MODAL"
 		? | Promise<ModalResult<Globals, Session, Locals>>
 			| ModalResult<Globals, Session, Locals>
-		: // non-GET routes only mutate: redirect to a renderer, or ack silently
-			Promise<RouteRedirect | undefined> | RouteRedirect | undefined;
+		: // non-GET routes only mutate; a redirect hands off to whatever
+			// shows the result of that mutation
+			Promise<RouteRedirect> | RouteRedirect;
 export type SessionProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,

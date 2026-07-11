@@ -1,7 +1,6 @@
 import { ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
-import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
@@ -31,7 +30,7 @@ export class RouteButtonBuilder<
 			"custom_id" | "customId" | "url"
 		> & {
 			to?: P | undefined;
-			toOptions?: RouteOptions | undefined;
+			toOptions?: RouteOptions<true> | undefined;
 		},
 	) {
 		const { to, toOptions, ...rest } = data ?? {};
@@ -67,15 +66,12 @@ export class RouteButtonBuilder<
 	 * @param queryParams any query parameters you want to add, can include :ts
 	 * @param method method to send to route
 	 */
-	public setTo(path: P, { method = "GET", queryParams }: RouteOptions = {}): this {
+	public setTo(
+		path: P,
+		{ method = "GET", queryParams }: RouteOptions<true> = {},
+	): this {
 		super.setCustomId(
-			encodeRouteCustomId(
-				this.#embedRouter,
-				"RouteButtonBuilder",
-				path,
-				method,
-				queryParams,
-			),
+			this.#embedRouter.encodePath(path, { method, queryParams }),
 		);
 		return this;
 	}

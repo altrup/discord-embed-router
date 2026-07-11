@@ -173,7 +173,7 @@ test("Router only listens for interactions with its prefix", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
 
-	const handler = vi.fn();
+	const handler = vi.fn().mockReturnValue({ redirect: "/test/3" });
 	const noPrefixButtonInteraction = mockButtonInteraction(
 		embedRouter.encodePath("/test/2", { idPrefix: "", method: "DELETE" }),
 	);
@@ -181,6 +181,7 @@ test("Router only listens for interactions with its prefix", async () => {
 		embedRouter.encodePath("/test/3", { method: "DELETE" }),
 	);
 
+	embedRouter.get("/test/:id", () => ({}));
 	embedRouter.delete("/test/:id", handler);
 
 	client.emit("interactionCreate", noPrefixButtonInteraction);
@@ -517,7 +518,7 @@ test("a redirect's queryParams option merges into the target path like dispatch'
 	expect(state.queryParams.get("b")).toBe("2");
 });
 
-test("taking over a message's cleanup through a redirect uses the redirecting route's own state, not the target's", async () => {
+test("taking over a message's cleanup through a redirect uses the target route's state, not the redirecting route's", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
 
@@ -539,8 +540,8 @@ test("taking over a message's cleanup through a redirect uses the redirecting ro
 
 	expect(cleanupFn).toHaveBeenCalledOnce();
 	const [newState] = cleanupFn.mock.calls[0]!;
-	expect(newState.path).toBe("/item/5");
-	expect(newState.params).toEqual({ id: "5" });
+	expect(newState.path).toBe("/items");
+	expect(newState.params).toEqual({});
 });
 
 test("a route redirecting into another route doesn't preempt its own message's cleanup a second time", async () => {
@@ -580,6 +581,39 @@ test("a redirect chain longer than the hop limit throws instead of looping forev
 	});
 });
 
+test("dispatch() throws if called on an interaction that's still being dispatched", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+
+	let reentrantResult: unknown;
+	embedRouter.get("/a", () => {
+		reentrantResult = embedRouter
+			.dispatch(interaction, "/a")
+			.catch((e: unknown) => e);
+		return { content: "ok" };
+	});
+
+	await embedRouter.dispatch(interaction, "/a");
+	await expect(reentrantResult).resolves.toMatchObject({
+		cause: { message: expect.stringContaining("still being dispatched") },
+	});
+});
+
+test("dispatch() called again on an interaction after it settles is allowed, e.g. from a setTimeout", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+
+	const handler = vi.fn().mockReturnValue({ content: "ok" });
+	embedRouter.get("/a", handler);
+
+	await embedRouter.dispatch(interaction, "/a");
+	await embedRouter.dispatch(interaction, "/a");
+
+	expect(handler).toHaveBeenCalledTimes(2);
+});
+
 test("a non-GET route handler returning content instead of a redirect throws, even past TypeScript", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -596,7 +630,7 @@ test("a non-GET route handler returning content instead of a redirect throws, ev
 	).rejects.toMatchObject({
 		cause: {
 			message: expect.stringContaining(
-				"Only GET route handlers can not return content",
+				"Non-GET route handlers must return a redirect",
 			),
 		},
 	});
@@ -718,6 +752,47 @@ test("a MODAL route can redirect to a GET renderer instead of showing a modal", 
 	expect(interaction.update).toHaveBeenCalledWith({ content: "gone" });
 });
 
+test("a non-GET route can redirect to a MODAL route to show a modal instead of rendering", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.post("/edit", () => ({
+		redirect: "/edit",
+		method: "MODAL",
+	}));
+	embedRouter.modal("/edit", () => ({
+		title: "edit",
+		customId: "edit",
+		components: [],
+	}));
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/edit", { method: "POST" });
+
+	expect(interaction.showModal).toHaveBeenCalledOnce();
+});
+
+test("a modal submission can't be routed into a MODAL route, since it can't itself show a modal", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.modal("/step2", () => ({
+		title: "step 2",
+		customId: "step2",
+		components: [],
+	}));
+
+	const interaction = mockModalSubmitInteraction("");
+
+	await expect(
+		embedRouter.dispatch(interaction, "/step2", { method: "MODAL" }),
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining("aren't modal submissions themselves"),
+		},
+	});
+});
+
 test("a MODAL handler returning undefined acks silently without showing a modal", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -834,7 +909,8 @@ test("a modal submission dispatches into an ordinary route with state.fields set
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
 
-	const handler = vi.fn();
+	const handler = vi.fn().mockReturnValue({ redirect: "/submit/7" });
+	embedRouter.get("/submit/:id", () => ({}));
 	embedRouter.post("/submit/:id", handler);
 
 	const interaction = mockModalSubmitInteraction(

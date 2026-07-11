@@ -1,7 +1,6 @@
 import { ChannelSelectMenuBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
-import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
@@ -34,7 +33,7 @@ export class RouteChannelSelectMenuBuilder<
 			"customId" | "custom_id"
 		> & {
 			pattern?: P | undefined;
-			patternOptions?: RouteOptions | undefined;
+			patternOptions?: RouteOptions<true> | undefined;
 		},
 	) {
 		const { pattern, patternOptions, ...rest } = data ?? {};
@@ -67,15 +66,12 @@ export class RouteChannelSelectMenuBuilder<
 	 * @param queryParams any query parameters you want to add, can include :ts :channelId
 	 * @param method method to send to route
 	 */
-	public setPattern(path: P, { method = "GET", queryParams }: RouteOptions = {}) {
+	public setPattern(
+		path: P,
+		{ method = "GET", queryParams }: RouteOptions<true> = {},
+	) {
 		super.setCustomId(
-			encodeRouteCustomId(
-				this.#embedRouter,
-				"RouteChannelSelectMenuBuilder",
-				path,
-				method,
-				queryParams,
-			),
+			this.#embedRouter.encodePath(path, { method, queryParams }),
 		);
 		return this;
 	}
