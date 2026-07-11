@@ -26,43 +26,51 @@ npm install discord-embed-router discord.js
 
 ```ts
 import { EmbedRouter, RouteButtonBuilder } from "discord-embed-router";
-import { ActionRowBuilder, ButtonStyle, Client, EmbedBuilder } from "discord.js";
+import {
+	ActionRowBuilder,
+	ButtonStyle,
+	Client,
+	EmbedBuilder,
+} from "discord.js";
 
 const client = new Client({ intents: [] });
 const router = new EmbedRouter<undefined, number>(client);
 router.onError(console.error);
 
 router.get("/counter", (embedRouter, interaction, state) => {
-  const value = state.session.get() ?? 0;
-  state.session.set(value);
+	const value = state.session.get() ?? 0;
+	state.session.set(value);
 
-  return {
-    embeds: [new EmbedBuilder().setTitle("Counter").setDescription(`${value}`)],
-    components: [
-      new ActionRowBuilder()
-        .addComponents(
-          new RouteButtonBuilder(embedRouter)
-            .setLabel("+1")
-            .setStyle(ButtonStyle.Success)
-            .setTo("/counter/increment", { method: "POST" }),
-        )
-        .toJSON(),
-    ],
-    // required whenever a route touches the session, so the router knows
-    // when to drop the stored count
-    timeout: 5 * 60 * 1000,
-  };
+	return {
+		embeds: [new EmbedBuilder().setTitle("Counter").setDescription(`${value}`)],
+		components: [
+			new ActionRowBuilder()
+				.addComponents(
+					new RouteButtonBuilder(embedRouter)
+						.setLabel("+1")
+						.setStyle(ButtonStyle.Success)
+						.setTo("/counter/increment", { method: "POST" }),
+				)
+				.toJSON(),
+		],
+		// required whenever a route touches the session, so the router knows
+		// when to drop the stored count
+		timeout: 5 * 60 * 1000,
+	};
 });
 
 router.post("/counter/increment", (_embedRouter, _interaction, state) => {
-  state.session.set((state.session.get() ?? 0) + 1);
-  return { redirect: "/counter" };
+	state.session.set((state.session.get() ?? 0) + 1);
+	return { redirect: "/counter" };
 });
 
 client.on("interactionCreate", async (interaction) => {
-  if (interaction.isChatInputCommand() && interaction.commandName === "counter") {
-    await router.dispatch(interaction, "/counter");
-  }
+	if (
+		interaction.isChatInputCommand() &&
+		interaction.commandName === "counter"
+	) {
+		await router.dispatch(interaction, "/counter");
+	}
 });
 
 client.login(process.env.DISCORD_TOKEN);

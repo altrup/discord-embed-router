@@ -164,6 +164,58 @@ test("decode() fills *tos on a string select menu from every chosen value", () =
 	});
 });
 
+test("decode() uses an option's own encoded method, overriding the select menu's pattern method", () => {
+	const encoder = new HashEncoder();
+	encoder.registerPath("/*to");
+	encoder.registerPath("/help");
+	const customId = encoder.encodePath("/*to", {
+		method: "GET",
+		idPrefix: ID_PREFIX,
+	});
+	const value = encoder.encodePath<true>("/help", {
+		method: "MODAL",
+		idPrefix: "",
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [value],
+		isStringSelectMenu: () => true,
+	});
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "MODAL",
+		path: "/help",
+	});
+});
+
+test("decode() falls back to the select menu's pattern method when an option has no method of its own", () => {
+	const encoder = new HashEncoder();
+	encoder.registerPath("/*to");
+	encoder.registerPath("/help");
+	const customId = encoder.encodePath("/*to", {
+		method: "POST",
+		idPrefix: ID_PREFIX,
+	});
+	const value = encoder.encodePath<true>("/help", {
+		method: "",
+		idPrefix: "",
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [value],
+		isStringSelectMenu: () => true,
+	});
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "POST",
+		path: "/help",
+	});
+});
+
 test("decode() fills userId/userIds on a user select menu from the raw selected ids", () => {
 	const encoder = new HashEncoder();
 	encoder.registerPath("/user/:userId");

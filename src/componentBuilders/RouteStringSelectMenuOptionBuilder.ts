@@ -31,7 +31,7 @@ export class RouteStringSelectMenuOptionBuilder<
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;
-			toOptions?: Omit<RouteOptions, "method"> | undefined;
+			toOptions?: RouteOptions | undefined;
 		},
 	) {
 		const { to, toOptions, label, ...rest } = data ?? {};
@@ -57,13 +57,15 @@ export class RouteStringSelectMenuOptionBuilder<
 	 *
 	 * @param path the path to route to, can include :ts
 	 * @param query any query parameters you want to add, can include :ts
-	 * @param method method to send to route
+	 * @param method method to send to route; defaults to empty, which defers
+	 * to whatever method the containing RouteStringSelectMenuBuilder's pattern
+	 * encodes. Set this to override the method for just this option.
 	 */
-	public setTo(path: P, { query }: Omit<RouteOptions, "method"> = {}): this {
+	public setTo(path: P, { method, query }: RouteOptions = {}): this {
 		super.setValue(
 			this.#embedRouter.encodePath<true>(path, {
 				idPrefix: "",
-				method: "",
+				method: method ?? "",
 				query,
 			}),
 		);

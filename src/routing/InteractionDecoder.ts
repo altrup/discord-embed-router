@@ -50,20 +50,20 @@ export class InteractionDecoder {
 			if (interaction.values.length === 0) return false;
 
 			if (interaction.isStringSelectMenu()) {
-				// also fill in variables for to's
-				const toLocations = interaction.values
+				const decodedOptions = interaction.values
 					.map((v) =>
 						this.#encoder.decodePath(v, {
 							idPrefix: "",
 							allowEmptyMethod: true,
 						}),
 					)
-					.filter((r) => r !== false)
-					.map((r) =>
-						this.#fillParams(r.path, {
-							ts: interaction.createdTimestamp.toString(),
-						}),
-					);
+					.filter((r) => r !== false);
+				// also fill in variables for to's
+				const toLocations = decodedOptions.map((r) =>
+					this.#fillParams(r.path, {
+						ts: interaction.createdTimestamp.toString(),
+					}),
+				);
 				const pathLocation = this.#fillParams(
 					decodedPath.path,
 					{
@@ -88,7 +88,9 @@ export class InteractionDecoder {
 					}
 				}
 				return {
-					method: decodedPath.method,
+					// an option can override the method for just that entry;
+					// otherwise fall back to the select menu's own pattern method
+					method: decodedOptions[0]?.method || decodedPath.method,
 					path: pathLocation.toString(),
 				};
 			}
