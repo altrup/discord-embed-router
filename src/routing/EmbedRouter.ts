@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import EventEmitter from "node:events";
 import path from "node:path";
 
@@ -11,9 +10,12 @@ import {
 } from "discord.js";
 import { match, MatchResult, Path } from "path-to-regexp";
 
+import { COMPONENT_PARAMS } from "@componentBuilders/componentParams";
 import { Encoder } from "@encoding/Encoder";
+import { HashEncoder } from "@encoding/HashEncoder";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
+import { puaCodepointsFrom } from "@helpers/puaCodepoints";
 import { toError } from "@helpers/toError";
 import { InteractionDecoder } from "@routing/InteractionDecoder";
 import { MessageQueue } from "@routing/MessageQueue";
@@ -38,7 +40,7 @@ import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler, SessionHandle } from "@sessions/types";
 import { ConfigError } from "@src/ConfigError";
-import { ID_PREFIX, PUA_RANGE, PUA_START } from "@src/consts";
+import { ID_PREFIX, PUA_RANGE } from "@src/consts";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
@@ -72,11 +74,11 @@ export class EmbedRouter<
 	#routes: Map<Method, CompiledRoute<Method, Globals, Session, Locals>[]> =
 		new Map();
 
-	// Encoder for paths
-	#encoder: Encoder = new Encoder();
-	#interactionDecoder: InteractionDecoder = new InteractionDecoder(
-		this.#encoder,
-	);
+	// Encoder for paths; assigned in the constructor (see #encoder's assignment
+	// there) since #interactionDecoder must be built from the resolved encoder,
+	// not a default that a passed-in `encoder` option would then replace
+	#encoder: Encoder;
+	#interactionDecoder: InteractionDecoder;
 
 	// Persistant storage
 	#globals: Globals | undefined;
@@ -143,22 +145,27 @@ export class EmbedRouter<
 			name = "",
 			idPrefix = ID_PREFIX,
 			globals,
+			encoder = new HashEncoder(),
 		}: {
 			name?: string | undefined;
 			idPrefix?: string | undefined;
 			globals?: Globals | undefined;
+			encoder?: Encoder | undefined;
 		} = {},
 	) {
 		super();
-
-		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE) {
-			throw new ConfigError(`You can not have more than ${PUA_RANGE} routers`);
-		}
 
 		this.#name = name;
 		this.#idPrefix = idPrefix;
 		this.#globals = globals;
 		this.#updateIdentifier();
+
+		this.#encoder = encoder;
+		this.#interactionDecoder = new InteractionDecoder(this.#encoder);
+		// componentBuilders embed these params into their paths regardless of
+		// whether a developer's own routes declare them, so register them up
+		// front to guarantee they get a compact encoding
+		COMPONENT_PARAMS.forEach((p) => this.#encoder.registerPath(p));
 
 		this.#client = client;
 		client?.on("interactionCreate", this.#attachedListener);
@@ -166,26 +173,34 @@ export class EmbedRouter<
 
 	#updateIdentifier() {
 		// Private Use Area: Unicode Characters not from any language
-		const hash = createHash("sha256").update(this.#name).digest();
-		let raw = hash.readUint32BE(0);
-		let char: string;
-		const nameCollisions = [];
-		// find next available identifier
-		while (true) {
-			const codepoint = PUA_START + (raw++ % PUA_RANGE);
-			char = String.fromCodePoint(codepoint);
+		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE)
+			throw new ConfigError(`You can not have more than ${PUA_RANGE} routers`);
 
-			const collisionRouter = EmbedRouter.#usedIdentifiers.get(char);
-			if (collisionRouter === undefined) break; // no collisions
+		let char: string | undefined;
+		const nameCollisions = [];
+		// find next available identifier; the size check above guarantees the
+		// generator (which cycles through the whole space before repeating)
+		// finds one within PUA_RANGE candidates
+		for (const candidate of puaCodepointsFrom(this.#name)) {
+			const collisionRouter = EmbedRouter.#usedIdentifiers.get(candidate);
+			if (collisionRouter === undefined) {
+				char = candidate;
+				break;
+			}
 
 			if (this.#name.length > 0 && collisionRouter.#name.length === 0) {
 				// evict old name; usedIdentifier is still taken
 				collisionRouter.#updateIdentifier();
+				char = candidate;
 				break;
 			}
 
 			nameCollisions.push(collisionRouter);
 		}
+		if (char === undefined)
+			throw new ConfigError(
+				"Internal error: no available identifier found despite passing the capacity check",
+			);
 		EmbedRouter.#usedIdentifiers.set(char, this as unknown as EmbedRouter);
 
 		if (nameCollisions.length > 0 && this.#name.length > 0) {

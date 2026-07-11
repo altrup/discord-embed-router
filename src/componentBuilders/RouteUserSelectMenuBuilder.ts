@@ -2,8 +2,15 @@ import { UserSelectMenuBuilder, UserSelectMenuComponentData } from "discord.js";
 import { Path } from "path-to-regexp";
 
 import { rejectKeys } from "@componentBuilders/rejectKeys";
-import { EmbedRouter } from "@routing/EmbedRouter";
+import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
+
+// path params this builder embeds into paths handed to encodePath
+export const ROUTE_USER_SELECT_MENU_BUILDER_PARAMS = [
+	":ts",
+	":userId",
+	"*userIds",
+] as const;
 
 export class RouteUserSelectMenuBuilder<
 	Globals = unknown,

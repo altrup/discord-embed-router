@@ -1,5 +1,10 @@
 export { EmbedRouter } from "@routing/EmbedRouter";
 
+export { ConfigError } from "@src/ConfigError";
+
+export { Encoder } from "@encoding/Encoder";
+export { HashEncoder } from "@encoding/HashEncoder";
+
 export { RouteButtonBuilder } from "@componentBuilders/RouteButtonBuilder";
 export { RouteModalBuilder } from "@componentBuilders/RouteModalBuilder";
 export { RouteStringSelectMenuBuilder } from "@componentBuilders/RouteStringSelectMenuBuilder";

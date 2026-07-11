@@ -5,7 +5,7 @@ import {
 } from "discord.js";
 import { expect, test } from "vitest";
 
-import { Encoder } from "@encoding/Encoder";
+import { HashEncoder } from "@encoding/HashEncoder";
 import { InteractionDecoder } from "@routing/InteractionDecoder";
 import { ID_PREFIX } from "@src/consts";
 
@@ -51,14 +51,14 @@ const mockSelectMenuInteraction = (overrides: {
 	}) as unknown as AnySelectMenuInteraction;
 
 test("decode() returns false when the customId doesn't start with idPrefix", () => {
-	const decoder = new InteractionDecoder(new Encoder());
+	const decoder = new InteractionDecoder(new HashEncoder());
 	const interaction = mockButtonInteraction("not-prefixed");
 
 	expect(decoder.decode(interaction, ID_PREFIX)).toBe(false);
 });
 
 test("decode() returns false when the encoder can't decode the path", () => {
-	const decoder = new InteractionDecoder(new Encoder());
+	const decoder = new InteractionDecoder(new HashEncoder());
 	// correct prefix, but no valid method-encoding character after it
 	const interaction = mockButtonInteraction(`${ID_PREFIX}!garbage`);
 
@@ -66,7 +66,7 @@ test("decode() returns false when the encoder can't decode the path", () => {
 });
 
 test("decode() decodes a button's customId and fills :ts from createdTimestamp", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/greet/:ts");
 	const customId = encoder.encodePath("/greet/:ts", {
 		method: "GET",
@@ -83,7 +83,7 @@ test("decode() decodes a button's customId and fills :ts from createdTimestamp",
 });
 
 test("decode() decodes a modal submission's customId the same way as a button's", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/submit/:ts");
 	const customId = encoder.encodePath("/submit/:ts", {
 		method: "POST",
@@ -100,7 +100,7 @@ test("decode() decodes a modal submission's customId the same way as a button's"
 });
 
 test("decode() returns false for a select menu with no selected values", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/*to");
 	const customId = encoder.encodePath("/*to", {
 		method: "GET",
@@ -114,7 +114,7 @@ test("decode() returns false for a select menu with no selected values", () => {
 });
 
 test("decode() fills :to on a string select menu from the chosen value's path", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/*to");
 	encoder.registerPath("/help");
 	const customId = encoder.encodePath("/*to", {
@@ -140,7 +140,7 @@ test("decode() fills :to on a string select menu from the chosen value's path", 
 });
 
 test("decode() fills *tos on a string select menu from every chosen value", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/multi/*tos");
 	encoder.registerPath("/a");
 	encoder.registerPath("/b");
@@ -165,7 +165,7 @@ test("decode() fills *tos on a string select menu from every chosen value", () =
 });
 
 test("decode() fills userId/userIds on a user select menu from the raw selected ids", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/user/:userId");
 	const customId = encoder.encodePath("/user/:userId", {
 		method: "GET",
@@ -186,7 +186,7 @@ test("decode() fills userId/userIds on a user select menu from the raw selected 
 });
 
 test("decode() fills channelId/channelIds on a channel select menu", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/channel/:channelId");
 	const customId = encoder.encodePath("/channel/:channelId", {
 		method: "GET",
@@ -207,7 +207,7 @@ test("decode() fills channelId/channelIds on a channel select menu", () => {
 });
 
 test("decode() fills roleId/roleIds on a role select menu", () => {
-	const encoder = new Encoder();
+	const encoder = new HashEncoder();
 	encoder.registerPath("/role/:roleId");
 	const customId = encoder.encodePath("/role/:roleId", {
 		method: "GET",

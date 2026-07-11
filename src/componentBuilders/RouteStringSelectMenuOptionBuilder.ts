@@ -5,8 +5,11 @@ import {
 import { Path } from "path-to-regexp";
 
 import { rejectKeys } from "@componentBuilders/rejectKeys";
-import { EmbedRouter } from "@routing/EmbedRouter";
+import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
+
+// path params this builder embeds into paths handed to encodePath
+export const ROUTE_STRING_SELECT_MENU_OPTION_BUILDER_PARAMS = [":ts"] as const;
 
 export class RouteStringSelectMenuOptionBuilder<
 	Globals = unknown,

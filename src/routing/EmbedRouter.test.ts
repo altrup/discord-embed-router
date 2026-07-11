@@ -1,9 +1,13 @@
 import EventEmitter from "node:events";
 
 import { ButtonInteraction, Client, ModalSubmitInteraction } from "discord.js";
+import { Path, Token } from "path-to-regexp";
 import { expect, test, vi } from "vitest";
 
+import { Encoder } from "@encoding/Encoder";
+import { HashEncoder } from "@encoding/HashEncoder";
 import { EmbedRouter } from "@routing/EmbedRouter";
+import { Method, RouteOptionsWithMethod } from "@routing/types";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;
 
@@ -614,6 +618,67 @@ test("a modal submission dispatches into an ordinary route with state.fields set
 	const [, , state] = handler.mock.calls[0]!;
 	expect(state.params).toEqual({ id: "7" });
 	expect(state.fields.getTextInputValue()).toBe("typed value");
+});
+
+test("componentBuilder params are registered automatically, giving them a compact encoding without an explicit route", () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const encoded = embedRouter.encodePath("/item/:ts", { method: "GET" });
+
+	expect(encoded).not.toContain(":ts");
+});
+
+test("a custom Encoder subclass passed to the constructor is used instead of the default HashEncoder", () => {
+	class RecordingEncoder extends Encoder {
+		#inner = new HashEncoder();
+		public registeredPaths: Path[] = [];
+
+		public registerPath<P extends Path>(path: P) {
+			this.registeredPaths.push(path);
+			this.#inner.registerPath(path);
+		}
+
+		public registerToken(token: Token) {
+			this.#inner.registerToken(token);
+		}
+
+		public encodePath<
+			AllowEmptyMethod extends boolean = false,
+			P extends Path = Path,
+		>(
+			path: P,
+			options: RouteOptionsWithMethod<AllowEmptyMethod> & { idPrefix: string },
+		) {
+			return this.#inner.encodePath(path, options);
+		}
+
+		public decodePath<P extends Path>(
+			path: P,
+			options: { idPrefix: string; allowEmptyMethod?: false },
+		): { method: Method; path: string } | false;
+		public decodePath<P extends Path>(
+			path: P,
+			options: { idPrefix: string; allowEmptyMethod: true },
+		): { method: Method | ""; path: string } | false;
+		public decodePath<P extends Path>(
+			path: P,
+			options: { idPrefix: string; allowEmptyMethod?: boolean },
+		): { method: Method | ""; path: string } | false {
+			return this.#inner.decodePath(
+				path,
+				options as { idPrefix: string; allowEmptyMethod: true },
+			);
+		}
+	}
+
+	const client = mockClient();
+	const encoder = new RecordingEncoder();
+	const embedRouter = new EmbedRouter(client, { encoder });
+
+	embedRouter.get("/custom/:id", () => ({}));
+
+	expect(encoder.registeredPaths).toContain("/custom/:id");
 });
 
 test("state.fields is undefined for dispatches that aren't modal submissions", async () => {

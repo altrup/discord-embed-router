@@ -3,8 +3,11 @@ import { Path } from "path-to-regexp";
 
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { DistributiveOmit } from "@helpers/types";
-import { EmbedRouter } from "@routing/EmbedRouter";
+import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptionsWithMethod } from "@routing/types";
+
+// path params this builder embeds into paths handed to encodePath
+export const ROUTE_MODAL_BUILDER_PARAMS = [":ts"] as const;
 
 export class RouteModalBuilder<
 	Globals = unknown,
