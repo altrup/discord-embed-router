@@ -1,8 +1,8 @@
 import { ModalBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
-import { isMethod } from "@helpers/isMethod";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptionsWithMethod } from "@routing/types";
@@ -40,7 +40,9 @@ export class RouteModalBuilder<
 
 		this.#embedRouter = embedRouter;
 		if (to && !toOptions)
-			throw new ConfigError("toOptions is required when to is set for RouteModalBuilder");
+			throw new ConfigError(
+				"toOptions is required when to is set for RouteModalBuilder",
+			);
 		if (to) this.setTo(to, toOptions!);
 	}
 
@@ -64,16 +66,15 @@ export class RouteModalBuilder<
 	 * @param query any query parameters you want to add, can include :ts
 	 */
 	public setTo(path: P, { method, query }: RouteOptionsWithMethod): this {
-		// only reachable by a JS caller (or an `as any`) bypassing the type
-		if (!isMethod(method))
-			throw new ConfigError(`Invalid method "${method}" for RouteModalBuilder`);
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, {
+			encodeRouteCustomId(
+				this.#embedRouter,
+				"RouteModalBuilder",
+				path,
 				method,
 				query,
-			}),
+			),
 		);
-
 		return this;
 	}
 }

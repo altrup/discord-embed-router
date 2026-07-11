@@ -6,9 +6,9 @@ import {
 } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
-import { isMethod } from "@helpers/isMethod";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
@@ -156,18 +156,15 @@ export class RouteStringSelectMenuBuilder<
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
-		// only reachable by a JS caller (or an `as any`) bypassing the type
-		if (!isMethod(method))
-			throw new ConfigError(
-				`Invalid method "${method}" for RouteStringSelectMenuBuilder`,
-			);
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, {
+			encodeRouteCustomId(
+				this.#embedRouter,
+				"RouteStringSelectMenuBuilder",
+				path,
 				method,
 				query,
-			}),
+			),
 		);
-
 		return this;
 	}
 }

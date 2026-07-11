@@ -1,8 +1,8 @@
 import { ButtonBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
-import { isMethod } from "@helpers/isMethod";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
@@ -68,18 +68,15 @@ export class RouteButtonBuilder<
 	 * @param method method to send to route
 	 */
 	public setTo(path: P, { method = "GET", query }: RouteOptions = {}): this {
-		// only reachable by a JS caller (or an `as any`) bypassing the type
-		if (!isMethod(method))
-			throw new ConfigError(
-				`Invalid method "${method}" for RouteButtonBuilder`,
-			);
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, {
+			encodeRouteCustomId(
+				this.#embedRouter,
+				"RouteButtonBuilder",
+				path,
 				method,
 				query,
-			}),
+			),
 		);
-
 		return this;
 	}
 }

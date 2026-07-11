@@ -1,8 +1,8 @@
 import { ChannelSelectMenuBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
+import { encodeRouteCustomId } from "@componentBuilders/encodeRouteCustomId";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
-import { isMethod } from "@helpers/isMethod";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import { RouteOptions } from "@routing/types";
@@ -69,18 +69,15 @@ export class RouteChannelSelectMenuBuilder<
 	 * @param method method to send to route
 	 */
 	public setPattern(path: P, { method = "GET", query }: RouteOptions = {}) {
-		// only reachable by a JS caller (or an `as any`) bypassing the type
-		if (!isMethod(method))
-			throw new ConfigError(
-				`Invalid method "${method}" for RouteChannelSelectMenuBuilder`,
-			);
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, {
+			encodeRouteCustomId(
+				this.#embedRouter,
+				"RouteChannelSelectMenuBuilder",
+				path,
 				method,
 				query,
-			}),
+			),
 		);
-
 		return this;
 	}
 }
