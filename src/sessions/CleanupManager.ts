@@ -8,9 +8,11 @@ import { ConfigError } from "@src/ConfigError";
 
 /**
  * Owns the timeout/cleanup lifecycle for messages. Session storage is a
- * separate concern (see SessionManager); this class only needs it to clear
- * a message's session on a real timeout — a cleanup handler's own session
- * access comes from its closure, not from anything injected here.
+ * separate concern (see SessionManager); a cleanup handler's own session
+ * access comes from its closure, not from anything injected here -- this
+ * class only needs SessionManager to reconcile whatever that closure left
+ * staged once the cleanup actually runs: committed if a new interaction is
+ * taking over, dropped along with the message on a real timeout.
  */
 export class CleanupManager<Globals, Session, Locals> {
 	#cleanups = new Map<
@@ -45,6 +47,19 @@ export class CleanupManager<Globals, Session, Locals> {
 	 */
 	public has(messageId: Snowflake): boolean {
 		return this.#cleanups.has(messageId);
+	}
+
+	/**
+	 * Returns the interaction that owns a message's currently pending
+	 * cleanup, without running or canceling it -- e.g. so a MODAL dispatch
+	 * (which deliberately doesn't preempt a pending cleanup) can still sync
+	 * its session data before opening its own.
+	 *
+	 * @param messageId the message to check
+	 * @returns the owning interaction, or undefined if none is pending
+	 */
+	public interactionFor(messageId: Snowflake): Interaction | undefined {
+		return this.#cleanups.get(messageId)?.interaction;
 	}
 
 	/**
@@ -119,8 +134,6 @@ export class CleanupManager<Globals, Session, Locals> {
 		this.#cleanups.delete(messageId);
 
 		const isTimeout = newState === undefined;
-		// only a real timeout means nobody is coming back to this message
-		if (isTimeout) this.#sessions.deleteForMessage(messageId);
 
 		try {
 			const result = await cleanup.cleanupFn?.(newState);
@@ -128,6 +141,13 @@ export class CleanupManager<Globals, Session, Locals> {
 		} catch (e: unknown) {
 			if (e instanceof ConfigError) throw e;
 			this.#report(e, cleanup.interaction, cleanup.route);
+		} finally {
+			if (isTimeout) {
+				this.#sessions.discard(cleanup.interaction);
+				this.#sessions.deleteForMessage(messageId);
+			} else {
+				this.#sessions.commit(cleanup.interaction, messageId);
+			}
 		}
 	}
 

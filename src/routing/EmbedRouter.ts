@@ -38,7 +38,7 @@ import type {
 } from "@routing/types";
 import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
-import type { ApplyHandler, SessionHandle } from "@sessions/types";
+import type { ApplyHandler } from "@sessions/types";
 import { ConfigError } from "@src/ConfigError";
 import { ID_PREFIX, PUA_RANGE } from "@src/consts";
 
@@ -357,7 +357,7 @@ export class EmbedRouter<
 			query,
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
-		}: RouteOptions & {
+		}: RouteOptions<true> & {
 			flags?: InteractionReplyOptions["flags"] | undefined;
 			locals?: Locals | undefined;
 		} = {},
@@ -374,7 +374,6 @@ export class EmbedRouter<
 				"message" in interaction
 					? (interaction.message ?? undefined)
 					: undefined;
-			const session = this.#sessionManager.open(interaction, message?.id);
 
 			const pathWithQuery = new Location(
 				pathToString(path, false),
@@ -384,15 +383,20 @@ export class EmbedRouter<
 				interaction,
 				method,
 				locals,
-				session,
 			});
 			if (resolved === false)
-				throw new ConfigError(`No route found for ${pathWithQuery}`);
+				throw new ConfigError(`No route found for ${pathWithQuery}`, {
+					method,
+					path,
+				});
 
 			if ("modal" in resolved) {
 				if (resolved.modal) {
 					if (flags)
-						throw new ConfigError("You can not set flags when showing a modal");
+						throw new ConfigError(
+							"You can not set flags when showing a modal",
+							{ method, path },
+						);
 					if (
 						interaction.replied ||
 						interaction.deferred ||
@@ -400,6 +404,7 @@ export class EmbedRouter<
 					)
 						throw new ConfigError(
 							"Modals can only be shown from interactions that haven't been replied to or deferred, and that aren't modal submissions themselves",
+							{ method, path },
 						);
 					await interaction.showModal(resolved.modal);
 				} else if (!interaction.replied && !interaction.deferred) {
@@ -422,6 +427,7 @@ export class EmbedRouter<
 				if (flags)
 					throw new ConfigError(
 						"You can only set flags for interactions that haven't been replied to",
+						{ method, path },
 					);
 				if (routeResponse) await interaction.editReply(routeResponse);
 			} else if (routeResponse === undefined) {
@@ -436,6 +442,7 @@ export class EmbedRouter<
 				if (flags)
 					throw new ConfigError(
 						"You can only set flags for interactions that haven't been replied to",
+						{ method, path },
 					);
 				await interaction.update(routeResponse);
 			} else {
@@ -445,25 +452,35 @@ export class EmbedRouter<
 				});
 			}
 
-			// Apply session and cleanup if needed
-			if (
-				(!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) &&
-				(routeResponse?.cleanup || session.has())
-			)
-				throw new ConfigError(
-					"Timeout is required for components using cleanups or sessions",
-				);
-			// Always start cleanup if timeout provided
-			if (!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) return;
-
 			message =
 				message ??
 				(await interaction.fetchReply().catch(() => {
 					throw new ConfigError(
 						"RouteRender can only be undefined for interactions that already have messages",
+						{ method, path },
 					);
 				}));
 			const resolvedMessage = message;
+
+			// Apply session and cleanup if needed
+			if (
+				(!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) &&
+				(routeResponse?.cleanup || this.#sessionManager.hasSession(interaction))
+			) {
+				this.#sessionManager.discard(interaction);
+				this.#sessionManager.deleteForMessage(resolvedMessage.id);
+				throw new ConfigError(
+					"Timeout is required for components using cleanups or sessions",
+					{ method, path },
+				);
+			}
+			// Always start cleanup if timeout provided
+			if (!routeResponse?.timeout || !isFinite(routeResponse?.timeout)) {
+				// no timeout, close session
+				this.#sessionManager.discard(interaction);
+				this.#sessionManager.deleteForMessage(resolvedMessage.id);
+				return;
+			}
 
 			const channel = interaction.channel;
 			const applyFn: ApplyHandler | undefined = resolvedMessage.flags.has(
@@ -479,7 +496,6 @@ export class EmbedRouter<
 					"DiscordEmbedRouterWarning",
 				);
 
-			this.#sessionManager.commit(interaction, resolvedMessage.id);
 			this.#cleanupManager.register(resolvedMessage.id, {
 				interaction,
 				cleanupFn: routeResponse.cleanup?.bind(routeResponse),
@@ -577,12 +593,10 @@ export class EmbedRouter<
 			interaction,
 			method = "GET",
 			locals,
-			session,
 		}: {
 			interaction: Interaction;
 			method?: Method;
 			locals: Locals | undefined;
-			session: SessionHandle<Session>;
 		},
 	): Promise<
 		| { message: RouteRender<Globals, Session, Locals> | undefined }
@@ -596,9 +610,7 @@ export class EmbedRouter<
 
 		for (let hop = 0; ; hop++) {
 			if (hop >= MAX_REDIRECTS)
-				throw new ConfigError(
-					`Too many redirects while resolving ${pathToString(path, false)}`,
-				);
+				throw new ConfigError(`Too many redirects`, { method, path });
 
 			// don't check validity because query params are considered invalid
 			const pathString = pathToString(currentPath, false);
@@ -614,36 +626,58 @@ export class EmbedRouter<
 				if (!result) continue;
 				matched = true;
 
+				const messageId =
+					"message" in interaction ? interaction.message?.id : undefined;
+
 				const state = {
 					...(result as MatchResult<ExtractParams<P>>),
 					queryParams: location.queryParams,
 					globals: this.#globals,
 					locals,
 					fields: interaction.isModalSubmit() ? interaction.fields : undefined,
-					// MODAL handlers may read the session (e.g. to prefill inputs)
-					// but nothing commits on the showModal path, so writes throw
-					session:
-						currentMethod === "MODAL"
-							? this.#sessionManager.readOnly(session)
-							: session,
 				};
 
 				// showing a modal never touches the message, so the previous
 				// render's cleanup is not preempted: it keeps running until the
 				// next non-MODAL dispatch or its own timeout
-				if (currentMethod !== "MODAL") {
-					const messageId =
-						"message" in interaction ? interaction.message?.id : undefined;
-					if (messageId !== undefined)
-						await this.#cleanupManager.run(messageId, state);
+				if (messageId !== undefined) {
+					const oldInteraction = this.#cleanupManager.interactionFor(messageId);
+
+					if (oldInteraction) {
+						this.#sessionManager.persist(oldInteraction, messageId);
+					}
+					if (method !== "MODAL") {
+						await this.#cleanupManager.run(messageId, {
+							...state,
+							// oldInteraction: session is committed in cleanup
+							// interaction: session is reused for handler
+							session: this.#sessionManager.open(
+								oldInteraction ?? interaction,
+								messageId,
+							),
+						});
+					}
 				}
 
-				routeResult = await route.handler(this, interaction, state);
+				routeResult = await route.handler(this, interaction, {
+					...state,
+					session:
+						currentMethod === "MODAL"
+							? this.#sessionManager.readOnly(
+									this.#sessionManager.open(interaction, messageId),
+								)
+							: this.#sessionManager.open(interaction, messageId),
+				});
 				break;
 			}
 			if (!matched) return false;
 
 			if (routeResult && "redirect" in routeResult) {
+				if ("cleanup" in routeResult || "timeout" in routeResult)
+					throw new ConfigError(
+						"cleanup and timeout are not supported in redirects",
+						{ method, path },
+					);
 				currentPath = routeResult.redirect;
 				currentMethod = "GET";
 				continue;
@@ -660,7 +694,8 @@ export class EmbedRouter<
 					("cleanup" in routeResult || "timeout" in routeResult)
 				)
 					throw new ConfigError(
-						`Route handler for MODAL ${pathToString(currentPath, false)} must not set cleanup or timeout; showing a modal never edits the message, so there is nothing for them to guard`,
+						`Route handler for MODAL does not support cleanup or timeout`,
+						{ method, path },
 					);
 				return {
 					modal: routeResult as
@@ -668,10 +703,10 @@ export class EmbedRouter<
 				};
 			}
 
-			// catches a JS caller (or an `as any`) returning content from a non-GET handler
 			if (routeResult && currentMethod !== "GET")
 				throw new ConfigError(
-					`Route handler for ${currentMethod} ${pathToString(currentPath, false)} must return a redirect or undefined, not content`,
+					`Only GET route handlers can not return content`,
+					{ method, path },
 				);
 
 			return {
@@ -705,6 +740,7 @@ export class EmbedRouter<
 		if (!this.#client)
 			throw new ConfigError(
 				`Cannot build a component customId for router "${this.#name || this.idPrefix}"; no client was passed to its constructor, so no interaction events are caught by the router`,
+				{ method, path },
 			);
 
 		return this.#encoder.encodePath(path, {

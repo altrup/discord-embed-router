@@ -8,14 +8,20 @@ import { Encoder } from "@encoding/Encoder";
 import { HashEncoder } from "@encoding/HashEncoder";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { Method, RouteOptionsWithMethod } from "@routing/types";
+import { ConfigError } from "@src/ConfigError";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;
+
+// real interactions always have a unique snowflake id, which SessionManager
+// keys its state by -- give every mock one so tests don't collide on it
+let nextInteractionId = 1;
 
 const mockButtonInteraction = (
 	customId: string,
 	overrides: Partial<ButtonInteraction> = {},
 ): ButtonInteraction => {
 	return {
+		id: `interaction-${nextInteractionId++}`,
 		customId,
 		createdTimestamp: Date.now(),
 		replied: false,
@@ -152,9 +158,13 @@ test("dispatch throws a ConfigError if a route sets a session or cleanup without
 
 	await expect(
 		embedRouter.dispatch(mockButtonInteraction(""), "/set"),
-	).rejects.toThrow(
-		"Timeout is required for components using cleanups or sessions",
-	);
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining(
+				"Timeout is required for components using cleanups or sessions",
+			),
+		},
+	});
 });
 
 test("an error thrown by a handler is wrapped with the method and path when reported via routeError", async () => {
@@ -296,6 +306,132 @@ test("a real timeout runs the cleanupFn with undefined, applies its result to th
 	}
 });
 
+test("a cleanupFn's session write through its own closed-over state.session is persisted when a new interaction takes over", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+	embedRouter.get("/a", (_router, _interaction, state) => {
+		state.session.set("in progress");
+		return {
+			cleanup: () => {
+				state.session.set("final value");
+				return undefined;
+			},
+			timeout: 1000,
+		};
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+
+	let seenSession: string | undefined;
+	embedRouter.get("/read", (_router, _interaction, state) => {
+		seenSession = state.session.get();
+		state.session.delete();
+		return {};
+	});
+	await embedRouter.dispatch(mockButtonInteraction(""), "/read");
+	expect(seenSession).toBe("final value");
+});
+
+test("a real timeout drops whatever cleanupFn wrote through its own closed-over state.session", async () => {
+	vi.useFakeTimers();
+	try {
+		const client = mockClient();
+		const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+		embedRouter.get("/a", (_router, _interaction, state) => {
+			state.session.set("in progress");
+			return {
+				cleanup: () => {
+					state.session.set("too late");
+					return undefined;
+				},
+				timeout: 1000,
+			};
+		});
+
+		await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+		await vi.advanceTimersByTimeAsync(1000);
+
+		let seenSession: string | undefined = "not read yet";
+		embedRouter.get("/read", (_router, _interaction, state) => {
+			seenSession = state.session.get();
+			return {};
+		});
+		await embedRouter.dispatch(mockButtonInteraction(""), "/read");
+		expect(seenSession).toBeUndefined();
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("a handler's own setTimeout writing to state.session throws once no cleanup/timeout was registered to keep it open", async () => {
+	vi.useFakeTimers();
+	try {
+		const client = mockClient();
+		const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+		let caught: unknown;
+		embedRouter.get("/a", (_router, _interaction, state) => {
+			// no cleanup/timeout returned, so dispatch() discards this handle
+			// as soon as the handler returns
+			setTimeout(() => {
+				try {
+					state.session.set("too late");
+				} catch (e) {
+					caught = e;
+				}
+			}, 500);
+			return {};
+		});
+
+		await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(caught).toBeInstanceOf(ConfigError);
+		expect((caught as Error).message).toContain(
+			"already been committed or discarded",
+		);
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+test("a handler's own setTimeout writing to state.session works if before cleanup", async () => {
+	vi.useFakeTimers();
+	try {
+		const client = mockClient();
+		const embedRouter = new EmbedRouter<undefined, string, undefined>(client);
+
+		embedRouter.get("/a", (_router, _interaction, state) => {
+			// no cleanup/timeout returned, so dispatch() discards this handle
+			// as soon as the handler returns
+			const timeout = setTimeout(() => {
+				state.session.set("allowed");
+			}, 500);
+			return {
+				cleanup: () => void clearTimeout(timeout),
+				timeout: 1000,
+			};
+		});
+
+		await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+		await vi.advanceTimersByTimeAsync(500);
+
+		let seenSession: string | undefined = "not read yet";
+		embedRouter.get("/read", (_router, _interaction, state) => {
+			seenSession = state.session.get();
+			return {
+				timeout: 1000,
+			};
+		});
+		await embedRouter.dispatch(mockButtonInteraction(""), "/read");
+		expect(seenSession).toBe("allowed");
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
 test("a route handler can redirect to another registered GET path, which renders instead", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -373,7 +509,9 @@ test("a redirect chain longer than the hop limit throws instead of looping forev
 
 	await expect(
 		embedRouter.dispatch(mockButtonInteraction(""), "/a"),
-	).rejects.toThrow("Too many redirects");
+	).rejects.toMatchObject({
+		cause: { message: expect.stringContaining("Too many redirects") },
+	});
 });
 
 test("a non-GET route handler returning content instead of a redirect throws, even past TypeScript", async () => {
@@ -389,7 +527,13 @@ test("a non-GET route handler returning content instead of a redirect throws, ev
 		embedRouter.dispatch(mockButtonInteraction(""), "/item/5", {
 			method: "DELETE",
 		}),
-	).rejects.toThrow("must return a redirect or undefined");
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining(
+				"Only GET route handlers can not return content",
+			),
+		},
+	});
 });
 
 test("a second interaction on a busy message is deferred immediately, then runs after the first finishes", async () => {
@@ -599,7 +743,11 @@ test("a MODAL route returning cleanup or timeout throws instead of silently drop
 		embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
 			method: "MODAL",
 		}),
-	).rejects.toThrow("must not set cleanup or timeout");
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining("does not support cleanup or timeout"),
+		},
+	});
 });
 
 test("a modal submission dispatches into an ordinary route with state.fields set", async () => {

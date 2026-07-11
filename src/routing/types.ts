@@ -113,8 +113,8 @@ export type CompiledRoute<
 	handler: RouteHandler<M, Globals, Session, Locals, P>;
 };
 
-export type RouteOptions = {
-	method?: Method;
+export type RouteOptions<AllowModal extends boolean = false> = {
+	method?: AllowModal extends true ? Method : Exclude<Method, "MODAL">;
 	query?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
 export type RouteOptionsWithMethod<AllowEmptyMethod extends boolean = false> = {

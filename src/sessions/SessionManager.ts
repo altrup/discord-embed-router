@@ -15,10 +15,8 @@ export class SessionManager<Session> {
 	#sessions = new Map<Snowflake, Session>();
 	// interaction.id -> working copy, alive for the duration of one dispatch
 	#staging = new Map<Snowflake, Session>();
-	// interaction ids with a still-open handle; a handle closes once its
-	// dispatch commits or discards it, so a reference held past that (e.g. in
-	// a caller's own setTimeout) throws instead of silently reading stale
-	// data or leaking a write back into #staging that nothing will ever commit
+	// interaction ids with a still-open handle
+	// we don't use #staging, so people are free to delete at choice
 	#open = new Set<Snowflake>();
 
 	/**
@@ -33,11 +31,41 @@ export class SessionManager<Session> {
 		interaction: Interaction,
 		messageId: Snowflake | undefined,
 	): SessionHandle<Session> {
-		const existing =
-			messageId !== undefined ? this.#sessions.get(messageId) : undefined;
-		if (existing !== undefined) this.#staging.set(interaction.id, existing);
-		this.#open.add(interaction.id);
+		if (!this.#open.has(interaction.id)) {
+			const existing =
+				messageId !== undefined ? this.#sessions.get(messageId) : undefined;
+			if (existing !== undefined) this.#staging.set(interaction.id, existing);
+			this.#open.add(interaction.id);
+		}
 		return this.#handleFor(this.#staging, interaction.id);
+	}
+
+	/**
+	 * Checks if an interaction has an active session
+	 *
+	 * @param interaction the interaction to check
+	 * @returns if interaction has an active session
+	 */
+	public hasSession(interaction: Interaction): boolean {
+		return this.#staging.has(interaction.id);
+	}
+
+	/**
+	 * Writes the working copy for `interaction` into the durable,
+	 * message-keyed store, without closing its handle -- e.g. so a session
+	 * set during a render that also registers a cleanup is visible to other
+	 * reads right away, while the cleanup may still read or write it later.
+	 *
+	 * @param interaction the interaction whose working copy should be persisted
+	 * @param messageId the message to persist the session under
+	 */
+	public persist(interaction: Interaction, messageId: Snowflake) {
+		const staged = this.#staging.get(interaction.id);
+		if (staged === undefined) {
+			this.#sessions.delete(messageId);
+			return;
+		}
+		this.#sessions.set(messageId, staged);
 	}
 
 	/**
@@ -48,14 +76,9 @@ export class SessionManager<Session> {
 	 * @param messageId the message to commit the session under
 	 */
 	public commit(interaction: Interaction, messageId: Snowflake) {
+		this.persist(interaction, messageId);
 		this.#open.delete(interaction.id);
-		const staged = this.#staging.get(interaction.id);
 		this.#staging.delete(interaction.id);
-		if (staged === undefined) {
-			this.#sessions.delete(messageId);
-			return;
-		}
-		this.#sessions.set(messageId, staged);
 	}
 
 	/**

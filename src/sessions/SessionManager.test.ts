@@ -71,6 +71,34 @@ test("commit() with nothing staged clears any existing durable session", () => {
 	expect(sessions.open(mockInteraction("int4"), "msg1").has()).toBe(false);
 });
 
+test("persist() writes the working copy into the durable store without closing the handle", () => {
+	const sessions = new SessionManager<{ count: number }>();
+	const interaction = mockInteraction("int1");
+
+	const handle = sessions.open(interaction, undefined);
+	handle.set({ count: 7 });
+	sessions.persist(interaction, "msg1");
+
+	expect(sessions.open(mockInteraction("int2"), "msg1").get()).toStrictEqual({
+		count: 7,
+	});
+	// the handle is still open, unlike after commit()
+	expect(() => handle.set({ count: 8 })).not.toThrow();
+});
+
+test("persist() with nothing staged clears any existing durable session", () => {
+	const sessions = new SessionManager<{ count: number }>();
+
+	sessions.open(mockInteraction("int1"), "msg1").set({ count: 1 });
+	sessions.commit(mockInteraction("int1"), "msg1");
+
+	const unrelated = mockInteraction("int2");
+	sessions.open(unrelated, undefined);
+	sessions.persist(unrelated, "msg1");
+
+	expect(sessions.open(mockInteraction("int3"), "msg1").has()).toBe(false);
+});
+
 test("discard() drops the working copy without touching the durable store", () => {
 	const sessions = new SessionManager<{ count: number }>();
 	const interaction = mockInteraction("int1");

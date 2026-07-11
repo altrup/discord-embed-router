@@ -41,6 +41,29 @@ test("has() reflects whether a message has a registered cleanup", () => {
 	expect(manager.has("msg1")).toBe(true);
 });
 
+test("interactionFor() returns the registered interaction without running or canceling its cleanup", async () => {
+	const manager = new CleanupManager<undefined, string, undefined>(
+		new SessionManager(),
+		vi.fn(),
+	);
+
+	expect(manager.interactionFor("msg1")).toBeUndefined();
+
+	const interaction = mockInteraction("int1");
+	const cleanupFn = vi.fn();
+	manager.register("msg1", {
+		interaction,
+		cleanupFn,
+		applyFn: undefined,
+		timeout: 10_000,
+		route: { method: "GET", path: "/x" },
+	});
+
+	expect(manager.interactionFor("msg1")).toBe(interaction);
+	expect(cleanupFn).not.toHaveBeenCalled();
+	expect(manager.has("msg1")).toBe(true);
+});
+
 test("run() invokes cleanupFn with the new state", async () => {
 	const manager = new CleanupManager<undefined, string, undefined>(
 		new SessionManager(),
@@ -120,8 +143,12 @@ test("a real timeout deletes the message's session; a new state does not", async
 		sessions,
 		vi.fn(),
 	);
+	// mirrors dispatch(), which always opens a handle for the registering
+	// interaction before register() ever runs
+	const int1 = mockInteraction("int1");
+	sessions.open(int1, "msg1");
 	manager.register("msg1", {
-		interaction: mockInteraction("int1"),
+		interaction: int1,
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
@@ -130,8 +157,10 @@ test("a real timeout deletes the message's session; a new state does not", async
 	await manager.run("msg1", mockState());
 	expect(sessions.open(mockInteraction("check1"), "msg1").has()).toBe(true);
 
+	const int2 = mockInteraction("int2");
+	sessions.open(int2, "msg1");
 	manager.register("msg1", {
-		interaction: mockInteraction("int2"),
+		interaction: int2,
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
@@ -139,6 +168,107 @@ test("a real timeout deletes the message's session; a new state does not", async
 	});
 	await manager.run("msg1", undefined);
 	expect(sessions.open(mockInteraction("check2"), "msg1").has()).toBe(false);
+});
+
+test("a cleanupFn's session write through its own closed-over handle is persisted when a new interaction takes over", async () => {
+	const sessions = new SessionManager<string>();
+	const interaction = mockInteraction("int1");
+	// mirrors a route handler's own state.session, which cleanupFn closes over
+	const session = sessions.open(interaction, "msg1");
+	session.set("before takeover");
+
+	const manager = new CleanupManager<undefined, string, undefined>(
+		sessions,
+		vi.fn(),
+	);
+	manager.register("msg1", {
+		interaction,
+		cleanupFn: () => {
+			session.set("final value");
+			return undefined;
+		},
+		applyFn: undefined,
+		timeout: 10_000,
+		route: { method: "GET", path: "/x" },
+	});
+
+	// a new interaction taking over -- not a real timeout
+	await manager.run("msg1", mockState());
+
+	expect(sessions.open(mockInteraction("check"), "msg1").get()).toBe(
+		"final value",
+	);
+});
+
+test("a real timeout drops whatever cleanupFn wrote through its own closed-over handle", async () => {
+	const sessions = new SessionManager<string>();
+	const interaction = mockInteraction("int1");
+	const session = sessions.open(interaction, "msg1");
+	session.set("before timeout");
+
+	const manager = new CleanupManager<undefined, string, undefined>(
+		sessions,
+		vi.fn(),
+	);
+	manager.register("msg1", {
+		interaction,
+		cleanupFn: () => {
+			session.set("too late");
+			return undefined;
+		},
+		applyFn: undefined,
+		timeout: 10_000,
+		route: { method: "GET", path: "/x" },
+	});
+
+	await manager.run("msg1", undefined);
+
+	expect(sessions.open(mockInteraction("check"), "msg1").has()).toBe(false);
+});
+
+test("a cleanupFn's session write doesn't throw, since register() leaves its handle open", async () => {
+	const sessions = new SessionManager<string>();
+	const interaction = mockInteraction("int1");
+	const session = sessions.open(interaction, "msg1");
+	session.set("hello");
+
+	const manager = new CleanupManager<undefined, string, undefined>(
+		sessions,
+		vi.fn(),
+	);
+	manager.register("msg1", {
+		interaction,
+		cleanupFn: undefined,
+		applyFn: undefined,
+		timeout: 10_000,
+		route: { method: "GET", path: "/x" },
+	});
+
+	// register() must not have already committed (and thus closed) the
+	// handle cleanupFn would otherwise still be relying on
+	expect(() => session.set("still open")).not.toThrow();
+});
+
+test("a cleanupFn's handle is closed after it runs, so a later write throws instead of leaking silently", async () => {
+	const sessions = new SessionManager<string>();
+	const interaction = mockInteraction("int1");
+	const session = sessions.open(interaction, "msg1");
+	session.set("hello");
+
+	const manager = new CleanupManager<undefined, string, undefined>(
+		sessions,
+		vi.fn(),
+	);
+	manager.register("msg1", {
+		interaction,
+		cleanupFn: undefined,
+		applyFn: undefined,
+		timeout: 10_000,
+		route: { method: "GET", path: "/x" },
+	});
+	await manager.run("msg1", undefined);
+
+	expect(() => session.set("too late")).toThrow(ConfigError);
 });
 
 test("applyFn only runs on a real timeout, and only if cleanupFn returned a result", async () => {
