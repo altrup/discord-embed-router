@@ -120,10 +120,7 @@ export const ticTacToe: {
 		return { redirect: path };
 	},
 	put: (_embedRouter, _interaction, { session, path }) => {
-		session.set({
-			...session.get(),
-			ticTacToeBoard: new TicTacToeBoard(),
-		});
+		session.delete();
 
 		return { redirect: path };
 	},
