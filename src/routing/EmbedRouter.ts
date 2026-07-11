@@ -1,5 +1,4 @@
 import EventEmitter from "node:events";
-import path from "node:path";
 
 import {
 	Client,
@@ -8,55 +7,47 @@ import {
 	Message,
 	MessageFlags,
 } from "discord.js";
-import { match, MatchResult, Path } from "path-to-regexp";
+import { Path } from "path-to-regexp";
 
 import { COMPONENT_PARAMS } from "@componentBuilders/componentParams";
 import { Encoder } from "@encoding/Encoder";
 import { HashEncoder } from "@encoding/HashEncoder";
 import { isMethod } from "@helpers/isMethod";
+import { isSupportedInteraction } from "@helpers/isSupportedInteraction";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
-import { puaCodepointsFrom } from "@helpers/puaCodepoints";
 import { toError } from "@helpers/toError";
+import { IdentifierRegistry } from "@routing/IdentifierRegistry";
 import { InteractionDecoder } from "@routing/InteractionDecoder";
 import { MessageQueue } from "@routing/MessageQueue";
+import { RouteRegistry } from "@routing/RouteRegistry";
 import type {
 	Args,
-	CompiledRoute,
 	EventNames,
 	ExtractParams,
 	Listener,
 	LocalsProvider,
-	Method,
-	ModalRender,
-	ModalResult,
 	RouteHandler,
 	RouteOptions,
 	RouteOptionsWithMethod,
-	RouteRender,
-	RouteResult,
 	Unused,
 } from "@routing/types";
 import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler } from "@sessions/types";
 import { ConfigError, RouteNotFoundError } from "@src/ConfigError";
-import { ID_PREFIX, PUA_RANGE } from "@src/consts";
+import { ID_PREFIX } from "@src/consts";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
 };
-
-// guards against a route handler that redirects into a cycle
-const MAX_REDIRECTS = 10;
 
 export class EmbedRouter<
 	Globals = Unused,
 	Session = Unused,
 	Locals = Unused,
 > extends EventEmitter<EmbedRouterEvents> {
-	// identifier -> embedRouter
-	static #usedIdentifiers = new Map<string, EmbedRouter>();
+	static #identifierRegistry = new IdentifierRegistry();
 
 	// Not used after constructor, but stored to check if this router is capable of using RouteComponentBuilders
 	#client: Client | undefined;
@@ -64,16 +55,15 @@ export class EmbedRouter<
 
 	// Name used to generate prefixes
 	#name = "";
+	get name() {
+		return this.#name;
+	}
 	// Prefix for customIds of RouteButtonBuilders
 	#idPrefix: string;
 	#identifier: string = "";
 	get idPrefix() {
 		return `${this.#idPrefix}${this.#identifier}`;
 	}
-
-	// All added routes
-	#routes: Map<Method, CompiledRoute<Method, Globals, Session, Locals>[]> =
-		new Map();
 
 	// Encoder for paths; assigned in the constructor (see #encoder's assignment
 	// there) since #interactionDecoder must be built from the resolved encoder,
@@ -97,6 +87,10 @@ export class EmbedRouter<
 	// on its own interaction (racing the response dispatch is about to send),
 	// which a redirect (including to MODAL) always replaces
 	#dispatchingInteractions: WeakSet<Interaction> = new WeakSet();
+	// holds registered routes and resolves paths against them; constructed
+	// once #encoder is assigned in the constructor body, so it's declared
+	// here but assigned there
+	#routeRegistry: RouteRegistry<Globals, Session, Locals>;
 
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
 
@@ -109,6 +103,52 @@ export class EmbedRouter<
 			throw new ConfigError(
 				`Router "${this.#name || this.idPrefix}" has been destroyed`,
 			);
+	}
+
+	/**
+	 *
+	 * @param client the client from discord.js to connect to
+	 * @param name the name to give the router. ensures buttons stay connected across restarts
+	 * @param idPrefix the prefix for customIds
+	 * @param globals object to pass into all routes
+	 */
+	constructor(
+		client?: Client | undefined,
+		{
+			name = "",
+			idPrefix = ID_PREFIX,
+			globals,
+			encoder = new HashEncoder(),
+		}: {
+			name?: string | undefined;
+			idPrefix?: string | undefined;
+			globals?: Globals | undefined;
+			encoder?: Encoder | undefined;
+		} = {},
+	) {
+		super();
+
+		this.#name = name;
+		this.#idPrefix = idPrefix;
+		this.#globals = globals;
+		this.#updateIdentifier();
+
+		this.#encoder = encoder;
+		this.#interactionDecoder = new InteractionDecoder(this.#encoder);
+		this.#routeRegistry = new RouteRegistry(
+			this,
+			this.#encoder,
+			this.#sessionManager,
+			this.#cleanupManager,
+			() => this.#globals,
+		);
+		// componentBuilders embed these params into their paths regardless of
+		// whether a developer's own routes declare them, so register them up
+		// front to guarantee they get a compact encoding
+		COMPONENT_PARAMS.forEach((p) => this.#encoder.registerPath(p));
+
+		this.#client = client;
+		client?.on("interactionCreate", this.#attachedListener);
 	}
 
 	/**
@@ -133,8 +173,8 @@ export class EmbedRouter<
 		this.#destroyed = true;
 		this.#client?.off("interactionCreate", this.#attachedListener);
 		this.#client = undefined;
-		EmbedRouter.#usedIdentifiers.delete(this.#identifier);
-		this.#routes.clear();
+		EmbedRouter.#identifierRegistry.release(this.#identifier);
+		this.#routeRegistry.clear();
 		this.#cleanupManager.clearAll();
 		this.#sessionManager.clearAll();
 		this.#globals = undefined;
@@ -170,107 +210,14 @@ export class EmbedRouter<
 		this.#localsProvider = undefined;
 	}
 
-	/**
-	 *
-	 * @param client the client from discord.js to connect to
-	 * @param name the name to give the router. ensures buttons stay connected across restarts
-	 * @param idPrefix the prefix for customIds
-	 * @param globals object to pass into all routes
-	 */
-	constructor(
-		client?: Client | undefined,
-		{
-			name = "",
-			idPrefix = ID_PREFIX,
-			globals,
-			encoder = new HashEncoder(),
-		}: {
-			name?: string | undefined;
-			idPrefix?: string | undefined;
-			globals?: Globals | undefined;
-			encoder?: Encoder | undefined;
-		} = {},
-	) {
-		super();
-
-		this.#name = name;
-		this.#idPrefix = idPrefix;
-		this.#globals = globals;
-		this.#updateIdentifier();
-
-		this.#encoder = encoder;
-		this.#interactionDecoder = new InteractionDecoder(this.#encoder);
-		// componentBuilders embed these params into their paths regardless of
-		// whether a developer's own routes declare them, so register them up
-		// front to guarantee they get a compact encoding
-		COMPONENT_PARAMS.forEach((p) => this.#encoder.registerPath(p));
-
-		this.#client = client;
-		client?.on("interactionCreate", this.#attachedListener);
-	}
-
 	#updateIdentifier() {
-		// Private Use Area: Unicode Characters not from any language
-		if (EmbedRouter.#usedIdentifiers.size >= PUA_RANGE)
-			throw new ConfigError(`You can not have more than ${PUA_RANGE} routers`);
-
-		let char: string | undefined;
-		const nameCollisions = [];
-		// find next available identifier; the size check above guarantees the
-		// generator (which cycles through the whole space before repeating)
-		// finds one within PUA_RANGE candidates
-		for (const candidate of puaCodepointsFrom(this.#name)) {
-			const collisionRouter = EmbedRouter.#usedIdentifiers.get(candidate);
-			if (collisionRouter === undefined) {
-				char = candidate;
-				break;
-			}
-
-			if (this.#name.length > 0 && collisionRouter.#name.length === 0) {
-				// evict old name; usedIdentifier is still taken
-				collisionRouter.#updateIdentifier();
-				char = candidate;
-				break;
-			}
-
-			nameCollisions.push(collisionRouter);
-		}
-		if (char === undefined)
-			throw new ConfigError(
-				"Internal error: no available identifier found despite passing the capacity check",
-			);
-		EmbedRouter.#usedIdentifiers.set(char, this as unknown as EmbedRouter);
-
-		if (nameCollisions.length > 0 && this.#name.length > 0) {
-			process.emitWarning(
-				`EmbedRouter identifier collision for name "${this.#name}" with ${nameCollisions.map((c) => `"${c.#name}"`).join(", ")}`,
-				"DiscordEmbedRouterWarning",
-			);
-		}
-		this.#identifier = char;
+		this.#identifier = EmbedRouter.#identifierRegistry.acquire(this);
 	}
 
-	#addRoute<M extends Method, P extends Path = Path>(
-		method: M,
-		routePath: P | P[],
-		handler: RouteHandler<M, Globals, Session, Locals, ExtractParams<P>>,
-	) {
-		this.#assertAlive();
-		const methodRoutes = this.#routes.get(method) ?? [];
-		methodRoutes.push({
-			method,
-			path: Array.isArray(routePath) ? routePath : [routePath],
-			matchFunction: match(routePath),
-			handler: handler as RouteHandler<M, Globals, Session, Locals>,
-		});
-		this.#routes.set(method, methodRoutes);
-
-		// register segments with encoder
-		if (Array.isArray(routePath)) {
-			routePath.forEach((p) => this.#encoder.registerPath(p));
-		} else {
-			this.#encoder.registerPath(routePath);
-		}
+	// called by IdentifierRegistry when this router's identifier is evicted
+	// to make room for a name collision
+	public reassignIdentifier() {
+		this.#updateIdentifier();
 	}
 
 	/**
@@ -283,7 +230,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"GET", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("GET", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("GET", routePath, handler);
 	}
 
 	/**
@@ -296,7 +244,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"POST", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("POST", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("POST", routePath, handler);
 	}
 
 	/**
@@ -309,7 +258,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"PUT", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("PUT", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("PUT", routePath, handler);
 	}
 
 	/**
@@ -322,7 +272,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"PATCH", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("PATCH", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("PATCH", routePath, handler);
 	}
 
 	/**
@@ -335,7 +286,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"DELETE", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("DELETE", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("DELETE", routePath, handler);
 	}
 
 	/**
@@ -348,7 +300,8 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<"MODAL", Globals, Session, Locals, ExtractParams<P>>,
 	) {
-		this.#addRoute("MODAL", routePath, handler);
+		this.#assertAlive();
+		this.#routeRegistry.addRoute("MODAL", routePath, handler);
 	}
 
 	/**
@@ -362,21 +315,7 @@ export class EmbedRouter<
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
 	) {
 		this.#assertAlive();
-		const pathString = pathToString(routePath);
-		for (const [method, routes] of embedRouter.#routes) {
-			for (const route of routes) {
-				this.#addRoute(
-					method,
-					route.path.map((p) => path.posix.join(pathString, pathToString(p))),
-					route.handler as unknown as RouteHandler<
-						Method,
-						Globals,
-						Session,
-						Locals
-					>,
-				);
-			}
-		}
+		this.#routeRegistry.use(routePath, embedRouter.#routeRegistry);
 	}
 
 	/**
@@ -431,7 +370,7 @@ export class EmbedRouter<
 				pathToString(path, false),
 				queryParams,
 			).toString();
-			const resolved = await this.#resolve(pathWithQuery, {
+			const resolved = await this.#routeRegistry.resolve(pathWithQuery, {
 				interaction,
 				method,
 				locals,
@@ -634,175 +573,7 @@ export class EmbedRouter<
 	 * @returns if interaction is a supported type
 	 */
 	public isSupportedInteraction(interaction: Interaction) {
-		return (
-			interaction.isMessageComponent() ||
-			interaction.isChatInputCommand() ||
-			interaction.isModalSubmit()
-		);
-	}
-
-	/**
-	 * Resolves a route to the associated message (DOES NOT UPDATE MESSAGE)
-	 *
-	 * @param interaction interaction to connect to
-	 * @param path path to route the interaction to
-	 * @param method method to send to route
-	 * @param locals additional info to pass in to page through state.local (optional)
-	 * @param session session handle already opened for this interaction
-	 * @returns discord message associated with route OR false
-	 */
-	async #resolve<P extends Path = Path>(
-		path: P,
-		{
-			interaction,
-			method = "GET",
-			locals,
-			values,
-		}: {
-			interaction: Interaction;
-			method?: Method;
-			locals: Locals | undefined;
-			values?: string[] | undefined;
-		},
-	): Promise<
-		| { message: RouteRender<Globals, Session, Locals> | undefined }
-		| { modal: ModalRender<Globals, Session, Locals> | undefined }
-		| false
-	> {
-		if (!this.isSupportedInteraction(interaction)) return false;
-
-		let currentPath: Path = path;
-		let currentMethod = method;
-
-		for (let hop = 0; ; hop++) {
-			if (hop >= MAX_REDIRECTS)
-				throw new ConfigError(`Too many redirects`, { method, path });
-
-			// don't check validity because query params are considered invalid
-			const pathString = pathToString(currentPath, false);
-			const location = new Location(pathString);
-
-			let routeResult:
-				| RouteResult<Globals, Session, Locals>
-				| ModalResult<Globals, Session, Locals>
-				| undefined;
-			let matched = false;
-			for (const route of this.#routes.get(currentMethod) ?? []) {
-				const result = route.matchFunction(location.pathname);
-				if (!result) continue;
-				matched = true;
-
-				const messageId =
-					"message" in interaction ? interaction.message?.id : undefined;
-
-				const state = {
-					...(result as MatchResult<ExtractParams<P>>),
-					queryParams: location.queryParams,
-					globals: this.#globals,
-					locals,
-					fields: interaction.isModalSubmit() ? interaction.fields : undefined,
-					values,
-				};
-
-				// only a GET hop can produce (or replace) a render, so the
-				// previous render's cleanup is only preempted there: a MODAL
-				// never touches the message, and a mutation that doesn't
-				// redirect into a GET leaves the message, and its cleanup,
-				// untouched too
-				if (messageId !== undefined) {
-					const oldInteraction = this.#cleanupManager.interactionFor(messageId);
-
-					if (oldInteraction) {
-						this.#sessionManager.persist(oldInteraction, messageId);
-					}
-					if (currentMethod === "GET") {
-						await this.#cleanupManager.run(messageId, {
-							...state,
-							// oldInteraction: session is committed in cleanup
-							// interaction: session is reused for handler
-							session: this.#sessionManager.open(
-								oldInteraction ?? interaction,
-								messageId,
-							),
-						});
-					}
-				}
-
-				routeResult = await route.handler(this, interaction, {
-					...state,
-					session:
-						currentMethod === "MODAL"
-							? this.#sessionManager.readOnly(
-									this.#sessionManager.open(interaction, messageId),
-								)
-							: this.#sessionManager.open(interaction, messageId),
-				});
-				break;
-			}
-			if (!matched) return false;
-
-			if (routeResult && "redirect" in routeResult) {
-				if ("cleanup" in routeResult || "timeout" in routeResult)
-					throw new ConfigError(
-						"cleanup and timeout are not supported in redirects",
-						{ method, path },
-					);
-				// only reachable by a JS caller (or an `as any`) bypassing the
-				// type: anything else would be calling another mutation, not
-				// handing off rendering
-				if (
-					routeResult.method !== undefined &&
-					routeResult.method !== "GET" &&
-					routeResult.method !== "MODAL"
-				)
-					throw new ConfigError(
-						`A redirect can only target GET or MODAL, not "${routeResult.method}"`,
-						{ method, path },
-					);
-				currentPath = routeResult.queryParams
-					? new Location(
-							pathToString(routeResult.redirect, false),
-							routeResult.queryParams,
-						).toString()
-					: routeResult.redirect;
-				currentMethod = routeResult.method ?? "GET";
-				continue;
-			}
-
-			// terminal results are tagged by kind (a modal payload is a plain
-			// object with no runtime discriminator, and each kind's undefined
-			// silent-ack takes a different path in dispatch)
-			if (currentMethod === "MODAL") {
-				// cleanup/timeout only make sense on a message render; catch them
-				// here so a JS caller doesn't have them silently dropped by showModal
-				if (
-					routeResult &&
-					("cleanup" in routeResult || "timeout" in routeResult)
-				)
-					throw new ConfigError(
-						`Route handler for MODAL does not support cleanup or timeout`,
-						{ method, path },
-					);
-				return {
-					modal: routeResult as
-						ModalRender<Globals, Session, Locals> | undefined,
-				};
-			}
-
-			// a redirect (the only valid non-GET result) already continued the
-			// loop above, so reaching here with a non-GET method means the
-			// handler returned content, or nothing at all
-			if (currentMethod !== "GET")
-				throw new ConfigError(`Non-GET route handlers must return a redirect`, {
-					method,
-					path,
-				});
-
-			return {
-				message: routeResult as
-					RouteRender<Globals, Session, Locals> | undefined,
-			};
-		}
+		return isSupportedInteraction(interaction);
 	}
 
 	/**
