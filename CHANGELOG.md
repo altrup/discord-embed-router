@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial stable release.
-- `EmbedRouter` with Express-style route registration (`get`/`post`/`put`/`patch`/`delete`/`modal`) and router nesting via `use`.
+- `EmbedRouter` with Express-style route registration (`get`/`post`/`put`/`patch`/`delete`/`modal`), multi-method registration via `route(path, handlers)`, and router nesting via `use`.
 - Component builders (`RouteButtonBuilder`, `RouteModalBuilder`, and the string/channel/role/user select menu builders) that encode a destination path and query into the component's `customId`.
 - Per-message sessions with `get`/`set`/`delete`, scoped by a required `timeout`.
 - Cleanup handlers that rewrite a message once its interaction window expires.

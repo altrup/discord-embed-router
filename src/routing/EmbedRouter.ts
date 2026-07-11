@@ -28,6 +28,7 @@ import type {
 	Listener,
 	LocalsProvider,
 	RouteHandler,
+	RouteHandlers,
 	RouteOptions,
 	RouteOptionsWithMethod,
 	Unused,
@@ -302,6 +303,43 @@ export class EmbedRouter<
 	) {
 		this.#assertAlive();
 		this.#routeRegistry.addRoute("MODAL", routePath, handler);
+	}
+
+	/**
+	 * Registers several method handlers for one path at once, mirroring the
+	 * shape of a module that exports its handlers as an object
+	 *
+	 * @param routePath path to match with
+	 * @param handlers handlers keyed by lowercase method (`get`, `post`, ...)
+	 */
+	public route<P extends Path = Path>(
+		routePath: P | P[],
+		handlers: RouteHandlers<Globals, Session, Locals, ExtractParams<P>>,
+	) {
+		this.#assertAlive();
+		// only reachable by a JS caller (or an `as any`) bypassing the type
+		for (const key of Object.keys(handlers))
+			if (!isMethod(key.toUpperCase(), { allowModal: true }))
+				throw new ConfigError(
+					`route() got unknown handler key "${key}"; expected get, post, put, patch, delete, or modal`,
+				);
+		if (
+			!handlers.get &&
+			!handlers.post &&
+			!handlers.put &&
+			!handlers.patch &&
+			!handlers.delete &&
+			!handlers.modal
+		)
+			throw new ConfigError(
+				"route() requires at least one method handler (get, post, put, patch, delete, or modal)",
+			);
+		if (handlers.get) this.get(routePath, handlers.get);
+		if (handlers.post) this.post(routePath, handlers.post);
+		if (handlers.put) this.put(routePath, handlers.put);
+		if (handlers.patch) this.patch(routePath, handlers.patch);
+		if (handlers.delete) this.delete(routePath, handlers.delete);
+		if (handlers.modal) this.modal(routePath, handlers.modal);
 	}
 
 	/**

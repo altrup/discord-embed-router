@@ -1,4 +1,4 @@
-import type { EmbedRouter, RouteHandler } from "discord-embed-router";
+import type { EmbedRouter, RouteHandlers } from "discord-embed-router";
 import { RouteButtonBuilder } from "discord-embed-router";
 import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
@@ -41,12 +41,7 @@ function cellButton(
 		});
 }
 
-export const ticTacToe: {
-	get: RouteHandler<"GET", Globals, Session, Locals>;
-	post: RouteHandler<"POST", Globals, Session, Locals>;
-	put: RouteHandler<"PUT", Globals, Session, Locals>;
-	patch: RouteHandler<"PATCH", Globals, Session, Locals>;
-} = {
+export const ticTacToe = {
 	get: (embedRouter, interaction, { path, session }) => {
 		const board = new TicTacToeBoard(session.get()?.ticTacToeBoard);
 
@@ -139,4 +134,4 @@ export const ticTacToe: {
 
 		return { redirect: path };
 	},
-};
+} satisfies RouteHandlers<Globals, Session, Locals>;

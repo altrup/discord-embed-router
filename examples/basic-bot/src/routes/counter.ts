@@ -1,6 +1,6 @@
 import {
 	RouteButtonBuilder,
-	RouteHandler,
+	RouteHandlers,
 	RouteModalBuilder,
 } from "discord-embed-router";
 import {
@@ -21,12 +21,7 @@ import {
 
 const INVALID_WARNING_TIMEOUT = 10_000;
 
-export const counter: {
-	get: RouteHandler<"GET", Globals, Session, Locals>;
-	put: RouteHandler<"PUT", Globals, Session, Locals>;
-	post: RouteHandler<"POST", Globals, Session, Locals>;
-	modal: RouteHandler<"MODAL", Globals, Session, Locals>;
-} = {
+export const counter = {
 	get: (embedRouter, interaction, { path, session, queryParams }) => {
 		const counterValue = session.get()?.count ?? 0;
 		const invalidValue = queryParams.get("invalidValue");
@@ -146,4 +141,4 @@ export const counter: {
 			)
 			.toJSON();
 	},
-};
+} satisfies RouteHandlers<Globals, Session, Locals>;

@@ -22,6 +22,7 @@ export type {
 	ModalRender,
 	ModalResult,
 	RouteHandler,
+	RouteHandlers,
 	Method,
 	RouteOptions,
 	RouteOptionsWithMethod,

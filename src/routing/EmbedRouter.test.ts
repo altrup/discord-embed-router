@@ -1031,3 +1031,54 @@ test("state.fields is undefined for dispatches that aren't modal submissions", a
 	const [, , state] = handler.mock.calls[0]!;
 	expect(state.fields).toBeUndefined();
 });
+
+test("route() registers every provided method handler at one path", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const getHandler = vi.fn().mockReturnValue({ content: "counter" });
+	const modalHandler = vi.fn().mockReturnValue(undefined);
+	embedRouter.route("/counter", {
+		get: getHandler,
+		post: () => ({ redirect: "/counter" }),
+		modal: modalHandler,
+	});
+
+	// the POST redirecting into a render proves both handlers were registered
+	await embedRouter.dispatch(mockButtonInteraction(""), "/counter", {
+		method: "POST",
+	});
+	expect(getHandler).toHaveBeenCalledOnce();
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/counter", {
+		method: "MODAL",
+	});
+	expect(modalHandler).toHaveBeenCalledOnce();
+});
+
+test("route() with no handlers throws a ConfigError", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	expect(() => embedRouter.route("/empty", {})).toThrow(ConfigError);
+});
+
+test("route() rejects unknown method keys at the type level and registers nothing at runtime", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	expect(() =>
+		// @ts-expect-error "gte" is not a method key
+		embedRouter.route("/typo", { gte: () => ({ content: "" }) }),
+	).toThrow(ConfigError);
+});
+
+test("route() throws a ConfigError naming any unknown handler key, even alongside valid ones", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	expect(() =>
+		embedRouter.route("/typo", {
+			get: () => ({ content: "" }),
+			// @ts-expect-error "psot" is not a method key
+			psot: () => ({ redirect: "/typo" }),
+		}),
+	).toThrow(/psot/);
+});

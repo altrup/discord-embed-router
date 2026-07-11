@@ -17,17 +17,11 @@ export const registerRoutes = (
 	const catalogRouter = new EmbedRouter<Globals, Session, Locals>();
 
 	catalogRouter.get("", catalog);
-	catalogRouter.get("/counter", counter.get);
-	catalogRouter.post("/counter", counter.post);
-	catalogRouter.put("/counter", counter.put);
-	catalogRouter.modal("/counter", counter.modal);
+	catalogRouter.route("/counter", counter);
 	catalogRouter.get("/user-info", userInfo);
 	catalogRouter.get("/user-info/{:userId}", userInfo);
 	catalogRouter.get("/timer", timer);
-	catalogRouter.get("/tic-tac-toe", ticTacToe.get);
-	catalogRouter.post("/tic-tac-toe", ticTacToe.post);
-	catalogRouter.put("/tic-tac-toe", ticTacToe.put);
-	catalogRouter.patch("/tic-tac-toe", ticTacToe.patch);
+	catalogRouter.route("/tic-tac-toe", ticTacToe);
 
 	router.use("/catalog", catalogRouter);
 };

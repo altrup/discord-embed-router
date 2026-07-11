@@ -107,6 +107,16 @@ export type RouteHandler<
 		: // non-GET routes only mutate; a redirect hands off to whatever
 			// shows the result of that mutation
 			Promise<RouteRedirect> | RouteRedirect;
+// handlers for one path keyed by lowercase method, registered together via
+// EmbedRouter.route(); optional keys let a path implement any subset of methods
+export type RouteHandlers<
+	Globals,
+	Session,
+	Locals,
+	P extends ParamData = ParamData,
+> = {
+	[M in Method as Lowercase<M>]?: RouteHandler<M, Globals, Session, Locals, P>;
+};
 export type SessionProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,

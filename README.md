@@ -86,6 +86,12 @@ See [`examples/basic-bot`](examples/basic-bot) for a full bot with multiple rout
 
 `router.get/post/put/patch/delete(path, handler)` registers a handler for a path, using [`path-to-regexp`](https://github.com/pillarjs/path-to-regexp) syntax for params (`/user/:id`). `router.modal(path, handler)` registers a handler that returns a modal to show instead of editing the message. A `GET` handler's return value is the new message content; other methods must return a `redirect` (to a registered `GET` path) or `undefined` (silent ack).
 
+When one path implements several methods, `router.route(path, handlers)` registers them all at once from an object keyed by lowercase method — handy when a module already exports its handlers that way:
+
+```ts
+router.route("/counter", { get, post, modal } satisfies RouteHandlers<...>);
+```
+
 Routers can be nested with `router.use(prefix, subRouter)`, mirroring how you'd compose an Express app.
 
 ### Component builders
