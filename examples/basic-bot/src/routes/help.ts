@@ -11,7 +11,7 @@ import type { Globals, Locals, Session } from "@routes/types";
 export const help: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,
 	interaction,
-	state,
+	{ globals },
 ) => {
 	return {
 		embeds: [
@@ -21,7 +21,7 @@ export const help: RouteHandler<"GET", Globals, Session, Locals> = (
 				.setDescription("The example bot for discord-embed-builder")
 				.addFields({
 					name: "Counter",
-					value: `Use </catalog:${state.globals?.commandIds.get("catalog")}> to view a list of all commands`,
+					value: `Use </catalog:${globals?.commandIds.get("catalog")}> to view a list of all commands`,
 				}),
 		],
 		components: [

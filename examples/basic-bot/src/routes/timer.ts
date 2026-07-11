@@ -1,20 +1,25 @@
 import { RouteButtonBuilder, RouteHandler } from "discord-embed-router";
 import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 
-import type { Globals, Locals, Session } from "@routes/types";
+import {
+	DEFAULT_TIMEOUT,
+	type Globals,
+	type Locals,
+	type Session,
+} from "@routes/types";
 
 export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,
 	interaction,
-	state,
+	{ path, queryParams },
 ) => {
-	const startTime = parseInt(state.queryParams.get("startTime") ?? "");
-	const dur = parseInt(state.queryParams.get("dur") ?? "");
+	const startTime = parseInt(queryParams.get("startTime") ?? "");
+	const dur = parseInt(queryParams.get("dur") ?? "");
 	const endTime = startTime + dur;
 
 	const timeout = !isNaN(endTime)
 		? setTimeout(() => {
-				embedRouter.dispatch(interaction, state.path);
+				embedRouter.dispatch(interaction, path);
 			}, endTime - new Date().getTime())
 		: null;
 
@@ -36,12 +41,12 @@ export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 						.setLabel("Stop")
 						.setStyle(ButtonStyle.Danger)
 						.setDisabled(isNaN(endTime))
-						.setTo(state.path),
+						.setTo(path),
 					new RouteButtonBuilder(embedRouter)
 						.setLabel("Start")
 						.setStyle(ButtonStyle.Success)
 						.setDisabled(!isNaN(endTime))
-						.setTo(state.path, {
+						.setTo(path, {
 							query: {
 								startTime: ":ts",
 								dur: "30000",
@@ -63,6 +68,6 @@ export const timer: RouteHandler<"GET", Globals, Session, Locals> = (
 				clearTimeout(timeout);
 			}
 		},
-		timeout: 10 * 60_000,
+		timeout: DEFAULT_TIMEOUT,
 	};
 };

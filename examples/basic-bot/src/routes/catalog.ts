@@ -12,7 +12,7 @@ import type { Globals, Locals, Session } from "@routes/types";
 export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,
 	interaction,
-	state,
+	{ path },
 ) => {
 	return {
 		embeds: [
@@ -30,15 +30,19 @@ export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
 							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("Counter")
 								.setDescription("A simple counter page")
-								.setTo(join(state.path, "counter")),
+								.setTo(join(path, "counter")),
 							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("User Info")
 								.setDescription("View someone's user info")
-								.setTo(join(state.path, "user-info")),
+								.setTo(join(path, "user-info")),
 							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("Timer")
 								.setDescription("A sample timer page")
-								.setTo(join(state.path, "timer")),
+								.setTo(join(path, "timer")),
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
+								.setLabel("Tic-Tac-Toe")
+								.setDescription("Play tic-tac-toe against the computer")
+								.setTo(join(path, "tic-tac-toe")),
 						),
 				)
 				.toJSON(),

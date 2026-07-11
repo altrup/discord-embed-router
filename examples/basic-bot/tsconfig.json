@@ -10,7 +10,8 @@
 			"@commands/*": ["./src/commands/*"],
 			"@commands": ["./src/commands"],
 			"@routes/*": ["./src/routes/*"],
-			"@routes": ["./src/routes"]
+			"@routes": ["./src/routes"],
+			"@games/*": ["./src/games/*"]
 		},
 		"ignoreDeprecations": "6.0",
 

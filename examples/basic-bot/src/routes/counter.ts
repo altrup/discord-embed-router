@@ -6,9 +6,9 @@ import type { Globals, Locals, Session } from "@routes/types";
 export const counter: RouteHandler<"GET", Globals, Session, Locals> = (
 	embedRouter,
 	interaction,
-	state,
+	{ path, queryParams },
 ) => {
-	const counterValue = parseInt(state.queryParams.get("value") ?? "0");
+	const counterValue = parseInt(queryParams.get("value") ?? "0");
 
 	return {
 		embeds: [
@@ -23,7 +23,7 @@ export const counter: RouteHandler<"GET", Globals, Session, Locals> = (
 					new RouteButtonBuilder(embedRouter)
 						.setLabel("Decrease")
 						.setStyle(ButtonStyle.Danger)
-						.setTo(state.path, {
+						.setTo(path, {
 							query: {
 								value: `${counterValue - 1}`,
 							},
@@ -33,7 +33,7 @@ export const counter: RouteHandler<"GET", Globals, Session, Locals> = (
 					new RouteButtonBuilder(embedRouter)
 						.setLabel("Increase")
 						.setStyle(ButtonStyle.Success)
-						.setTo(state.path, {
+						.setTo(path, {
 							query: {
 								value: `${counterValue + 1}`,
 							},

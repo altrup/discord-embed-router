@@ -15,7 +15,7 @@ export const help = {
 		router: EmbedRouter<Globals, Session, Locals>,
 		interaction: ChatInputCommandInteraction,
 	) {
-		router.dispatch(interaction, "/help", {
+		await router.dispatch(interaction, "/help", {
 			flags: [MessageFlags.Ephemeral],
 		});
 	},

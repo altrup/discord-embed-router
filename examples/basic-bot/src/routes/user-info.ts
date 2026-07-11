@@ -12,10 +12,9 @@ import type { Globals, Locals, Session } from "@routes/types";
 export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
 	embedRouter,
 	interaction,
-	state,
+	{ path, params },
 ) => {
-	const userId =
-		typeof state.params.userId === "string" ? state.params.userId : undefined;
+	const userId = typeof params.userId === "string" ? params.userId : undefined;
 	const user =
 		typeof userId === "string"
 			? await interaction.client.users.fetch(userId)
@@ -50,7 +49,7 @@ export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
 			new ActionRowBuilder()
 				.addComponents(
 					new RouteUserSelectMenuBuilder(embedRouter)
-						.setPattern(join(state.path.replace(userId ?? "", ""), ":userId"))
+						.setPattern(join(path.replace(userId ?? "", ""), ":userId"))
 						.setPlaceholder("Choose a user")
 						.setDefaultUsers(userId ? [userId] : []),
 				)

@@ -15,7 +15,7 @@ export const catalog = {
 		router: EmbedRouter<Globals, Session, Locals>,
 		interaction: ChatInputCommandInteraction,
 	) {
-		router.dispatch(interaction, "/catalog", {
+		await router.dispatch(interaction, "/catalog", {
 			flags: [MessageFlags.Ephemeral],
 		});
 	},
