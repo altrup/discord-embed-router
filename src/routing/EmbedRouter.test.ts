@@ -624,6 +624,20 @@ test("a button encoded with method MODAL routes to the modal route through the l
 	);
 });
 
+test("dispatch accepts a MODAL method, since it's the only method-accepting API that does", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const modal = { customId: "raw", title: "Edit", components: [] };
+	embedRouter.modal("/edit/:id", () => modal);
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/edit/5", {
+			method: "MODAL",
+		}),
+	).resolves.toBeUndefined();
+});
+
 test("a MODAL route can redirect to a GET renderer instead of showing a modal", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);

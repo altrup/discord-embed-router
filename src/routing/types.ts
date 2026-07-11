@@ -99,7 +99,15 @@ export type LocalsProvider<Globals, Session, Locals> = (
 	interaction: Interaction,
 ) => Locals;
 
-export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "MODAL";
+export const methodsList = [
+	"GET",
+	"POST",
+	"PUT",
+	"PATCH",
+	"DELETE",
+	"MODAL",
+] as const;
+export type Method = (typeof methodsList)[number];
 export type CompiledRoute<
 	M extends Method,
 	Globals,

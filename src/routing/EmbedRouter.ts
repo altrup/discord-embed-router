@@ -13,6 +13,7 @@ import { match, MatchResult, Path } from "path-to-regexp";
 import { COMPONENT_PARAMS } from "@componentBuilders/componentParams";
 import { Encoder } from "@encoding/Encoder";
 import { HashEncoder } from "@encoding/HashEncoder";
+import { isMethod } from "@helpers/isMethod";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
 import { puaCodepointsFrom } from "@helpers/puaCodepoints";
@@ -368,6 +369,9 @@ export class EmbedRouter<
 				throw new Error(
 					`Interactions type is not supported: ${interaction.type}`,
 				);
+			// only reachable by a JS caller (or an `as any`) bypassing the type
+			if (!isMethod(method, { allowModal: true }))
+				throw new ConfigError(`Invalid method "${method}"`, { method, path });
 
 			// modal submits shown from a command have no message
 			message =
@@ -742,6 +746,11 @@ export class EmbedRouter<
 				`Cannot build a component customId for router "${this.#name || this.idPrefix}"; no client was passed to its constructor, so no interaction events are caught by the router`,
 				{ method, path },
 			);
+		// "" is a deliberate override (e.g. a select menu option that opts out
+		// of the menu's own method); only reachable by a JS caller (or an `as
+		// any`) bypassing the type otherwise
+		if (method !== "" && !isMethod(method, { allowModal: true }))
+			throw new ConfigError(`Invalid method "${method}"`, { method, path });
 
 		return this.#encoder.encodePath(path, {
 			idPrefix,
