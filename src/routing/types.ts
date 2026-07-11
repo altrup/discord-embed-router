@@ -52,8 +52,11 @@ export type RouteRender<Globals, Session, Locals> =
 		);
 // hands off rendering to another registered path, always resolved as a GET.
 // no cleanup/timeout here: only a renderer should own those, so a redirect
-// that wants one set passes it via the target's path/query instead
-export type RouteRedirect = { redirect: Path };
+// that wants one set passes it via the target's path/queryParams instead
+export type RouteRedirect = {
+	redirect: Path;
+	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+};
 export type RouteResult<Globals, Session, Locals> =
 	RouteRedirect | RouteRender<Globals, Session, Locals>;
 // the modal to show; showModal() itself accepts either a builder or plain data

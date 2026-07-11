@@ -497,6 +497,26 @@ test("a route handler can redirect to another registered GET path, which renders
 	expect(state.params).toEqual({ id: "5" });
 });
 
+test("a redirect's queryParams option merges into the target path like dispatch's does", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const getHandler = vi.fn().mockReturnValue({ content: "item" });
+	embedRouter.get("/item", getHandler);
+	embedRouter.delete("/item", () => ({
+		redirect: "/item?a=1",
+		queryParams: { b: "2" },
+	}));
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/item", {
+		method: "DELETE",
+	});
+
+	const [, , state] = getHandler.mock.calls[0]!;
+	expect(state.queryParams.get("a")).toBe("1");
+	expect(state.queryParams.get("b")).toBe("2");
+});
+
 test("taking over a message's cleanup through a redirect uses the redirecting route's own state, not the target's", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter<undefined, string, undefined>(client);

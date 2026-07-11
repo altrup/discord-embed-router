@@ -734,7 +734,12 @@ export class EmbedRouter<
 						"cleanup and timeout are not supported in redirects",
 						{ method, path },
 					);
-				currentPath = routeResult.redirect;
+				currentPath = routeResult.queryParams
+					? new Location(
+							pathToString(routeResult.redirect, false),
+							routeResult.queryParams,
+						).toString()
+					: routeResult.redirect;
 				currentMethod = "GET";
 				continue;
 			}
