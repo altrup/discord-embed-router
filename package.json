@@ -1,17 +1,18 @@
 {
 	"name": "discord-embed-router",
 	"version": "0.9.2",
-	"description": "A vite inspired router for discord.js embeds and interactions",
+	"description": "An Express-inspired router for discord.js embeds and interactions",
 	"files": [
 		"dist"
 	],
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"sideEffects": false,
 	"exports": {
 		".": {
 			"import": {
 				"types": "./dist/index.d.mts",
-				"default": "./dist/index.js"
+				"default": "./dist/index.mjs"
 			},
 			"require": {
 				"types": "./dist/index.d.ts",
@@ -46,6 +47,9 @@
 	},
 	"license": "MIT",
 	"author": "Eric Liu",
+	"engines": {
+		"node": ">=18"
+	},
 	"type": "commonjs",
 	"workspaces": [
 		"examples/basic-bot"
