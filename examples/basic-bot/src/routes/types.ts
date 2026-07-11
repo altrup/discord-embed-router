@@ -9,6 +9,7 @@ export type Globals = {
 
 export type Session = {
 	ticTacToeBoard?: TicTacToeBoard;
+	count?: number;
 };
 
 export type Locals = unknown;

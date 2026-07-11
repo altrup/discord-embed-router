@@ -17,7 +17,8 @@ export const registerRoutes = (
 	const catalogRouter = new EmbedRouter<Globals, Session, Locals>();
 
 	catalogRouter.get("", catalog);
-	catalogRouter.get("/counter", counter);
+	catalogRouter.get("/counter", counter.get);
+	catalogRouter.post("/counter", counter.post);
 	catalogRouter.get("/user-info", userInfo);
 	catalogRouter.get("/user-info/{:userId}", userInfo);
 	catalogRouter.get("/timer", timer);
