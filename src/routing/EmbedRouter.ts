@@ -96,15 +96,43 @@ export class EmbedRouter<
 
 	#localsProvider: undefined | LocalsProvider<Globals, Session, Locals>;
 
+	#destroyed = false;
+
+	// throws on any call after destroy(), instead of quietly operating on a
+	// router with no identifier/client/routes left
+	#assertAlive() {
+		if (this.#destroyed)
+			throw new ConfigError(`Router "${this.#name || this.idPrefix}" has been destroyed`);
+	}
+
 	/**
 	 * Sets the client which we listen for interaections on
 	 *
 	 * @param client the client to listen to
 	 */
 	public setClient(client: Client) {
+		this.#assertAlive();
 		this.#client?.off("interactionCreate", this.#attachedListener);
 		this.#client = client;
 		client?.on("interactionCreate", this.#attachedListener);
+	}
+
+	/**
+	 * Detaches this router from its client and releases its identifier, so a
+	 * router that's no longer needed doesn't keep its identifier (and
+	 * everything it closes over) reachable for the life of the process.
+	 */
+	public destroy() {
+		if (this.#destroyed) return;
+		this.#destroyed = true;
+		this.#client?.off("interactionCreate", this.#attachedListener);
+		this.#client = undefined;
+		EmbedRouter.#usedIdentifiers.delete(this.#identifier);
+		this.#routes.clear();
+		this.#cleanupManager.clearAll();
+		this.#sessionManager.clearAll();
+		this.#globals = undefined;
+		this.#localsProvider = undefined;
 	}
 
 	/**
@@ -113,6 +141,7 @@ export class EmbedRouter<
 	 * @param globals new globals
 	 */
 	public setGlobals(globals: Globals) {
+		this.#assertAlive();
 		this.#globals = globals;
 	}
 
@@ -124,12 +153,14 @@ export class EmbedRouter<
 	public setLocalsProvider(
 		localsProvider: LocalsProvider<Globals, Session, Locals>,
 	) {
+		this.#assertAlive();
 		this.#localsProvider = localsProvider;
 	}
 	/**
 	 * deletes the locals provider on this router
 	 */
 	public deleteLocalsProvider() {
+		this.#assertAlive();
 		this.#localsProvider = undefined;
 	}
 
@@ -218,6 +249,7 @@ export class EmbedRouter<
 		routePath: P | P[],
 		handler: RouteHandler<M, Globals, Session, Locals, ExtractParams<P>>,
 	) {
+		this.#assertAlive();
 		const methodRoutes = this.#routes.get(method) ?? [];
 		methodRoutes.push({
 			method,
@@ -323,6 +355,7 @@ export class EmbedRouter<
 		routePath: P,
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
 	) {
+		this.#assertAlive();
 		const pathString = pathToString(routePath);
 		for (const [method, routes] of embedRouter.#routes) {
 			for (const route of routes) {
@@ -365,6 +398,7 @@ export class EmbedRouter<
 	) {
 		let message: Message | undefined;
 		try {
+			this.#assertAlive();
 			if (!this.isSupportedInteraction(interaction))
 				throw new Error(
 					`Interactions type is not supported: ${interaction.type}`,
@@ -529,6 +563,9 @@ export class EmbedRouter<
 		// even though this interaction never went through a user's own call site
 		let route: { method: Method; path: string } | undefined;
 		try {
+			// destroyed mid-flight (e.g. by a handler triggered from this same
+			// event loop turn); nothing left to dispatch to
+			if (this.#destroyed) return;
 			if (
 				!this.isSupportedInteraction(interaction) ||
 				interaction.isChatInputCommand()
@@ -750,6 +787,7 @@ export class EmbedRouter<
 			idPrefix?: string | undefined;
 		},
 	) {
+		this.#assertAlive();
 		if (!this.#client)
 			throw new ConfigError(
 				`Cannot build a component customId for router "${this.#name || this.idPrefix}"; no client was passed to its constructor, so no interaction events are caught by the router`,

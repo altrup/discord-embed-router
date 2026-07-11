@@ -101,6 +101,52 @@ test("Router warns about named collisions", () => {
 	);
 });
 
+test("destroy() releases a router's identifier for reuse without a collision warning", () => {
+	const client = mockClient();
+	const warningSpy = vi
+		.spyOn(process, "emitWarning")
+		.mockImplementation(() => {});
+
+	const first = new EmbedRouter(client, { name: "destroy-test" });
+	first.destroy();
+	warningSpy.mockClear();
+	new EmbedRouter(client, { name: "destroy-test" });
+
+	expect(warningSpy).not.toHaveBeenCalled();
+});
+
+test("destroy() clears registered routes and rejects further dispatch", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get("/test", () => ({}));
+
+	embedRouter.destroy();
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/test"),
+	).rejects.toThrow("has been destroyed");
+});
+
+test("destroy() is idempotent", () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.destroy();
+	expect(() => embedRouter.destroy()).not.toThrow();
+});
+
+test("methods other than destroy() throw after destroy()", () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.destroy();
+
+	expect(() => embedRouter.get("/test", () => ({}))).toThrow(
+		"has been destroyed",
+	);
+	expect(() => embedRouter.setClient(client)).toThrow("has been destroyed");
+});
+
 test("Router dispatch calls route handler with data", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);

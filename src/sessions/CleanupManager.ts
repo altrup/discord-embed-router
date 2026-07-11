@@ -9,7 +9,7 @@ import { ConfigError } from "@src/ConfigError";
 /**
  * Owns the timeout/cleanup lifecycle for messages. Session storage is a
  * separate concern (see SessionManager); a cleanup handler's own session
- * access comes from its closure, not from anything injected here -- this
+ * access comes from its closure, not from anything injected here. This
  * class only needs SessionManager to reconcile whatever that closure left
  * staged once the cleanup actually runs: committed if a new interaction is
  * taking over, dropped along with the message on a real timeout.
@@ -51,9 +51,9 @@ export class CleanupManager<Globals, Session, Locals> {
 
 	/**
 	 * Returns the interaction that owns a message's currently pending
-	 * cleanup, without running or canceling it -- e.g. so a MODAL dispatch
-	 * (which deliberately doesn't preempt a pending cleanup) can still sync
-	 * its session data before opening its own.
+	 * cleanup, without running or canceling it. Lets a MODAL dispatch (which
+	 * deliberately doesn't preempt a pending cleanup) still sync its session
+	 * data before opening its own.
 	 *
 	 * @param messageId the message to check
 	 * @returns the owning interaction, or undefined if none is pending
@@ -65,7 +65,7 @@ export class CleanupManager<Globals, Session, Locals> {
 	/**
 	 * Registers a cleanup for a message. Any existing cleanup for the message
 	 * is assumed to have already been run (with the new state) by the caller
-	 * before the new route handler ran — this just cancels its timer so it
+	 * before the new route handler ran. This just cancels its timer so it
 	 * doesn't leak.
 	 *
 	 * @param messageId the message to register a cleanup for
@@ -99,7 +99,7 @@ export class CleanupManager<Globals, Session, Locals> {
 			applyFn,
 			route,
 			// nothing awaits this timer, so a rethrown ConfigError has no
-			// caller to catch it -- report instead of letting it go unhandled
+			// caller to catch it: report instead of letting it go unhandled
 			timer: setTimeout(() => {
 				this.run(messageId, undefined).catch((e: unknown) =>
 					this.#report(e, interaction, route),
@@ -116,6 +116,14 @@ export class CleanupManager<Globals, Session, Locals> {
 	public remove(messageId: Snowflake) {
 		clearTimeout(this.#cleanups.get(messageId)?.timer);
 		this.#cleanups.delete(messageId);
+	}
+
+	/**
+	 * Cancels every registered cleanup without running any of them.
+	 */
+	public clearAll() {
+		for (const { timer } of this.#cleanups.values()) clearTimeout(timer);
+		this.#cleanups.clear();
 	}
 
 	/**

@@ -240,9 +240,7 @@ export class HashEncoder extends Encoder {
 					.map((s) => this.#splitEncodedSegment(s))
 					.flat();
 				decodedTokens.push(
-					...segments
-						.map((s) => parse(this.#decodeSegment(s)).tokens)
-						.flat(),
+					...segments.map((s) => parse(this.#decodeSegment(s)).tokens).flat(),
 				);
 			}
 		}

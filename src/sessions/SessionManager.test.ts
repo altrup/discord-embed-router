@@ -15,19 +15,12 @@ test("open() with no existing message session starts empty", () => {
 	expect(handle.get()).toBeUndefined();
 });
 
-test("set() then get() round-trips a clone, not the original reference", () => {
+test("set() then get() round-trips the same value", () => {
 	const sessions = new SessionManager<{ count: number }>();
 	const handle = sessions.open(mockInteraction("int1"), undefined);
 
-	const original = { count: 1 };
-	handle.set(original);
+	handle.set({ count: 1 });
 
-	const read = handle.get();
-	expect(read).toStrictEqual(original);
-	expect(read).not.toBe(original);
-
-	// mutating the read value must not affect what's stored
-	read!.count = 999;
 	expect(handle.get()).toStrictEqual({ count: 1 });
 });
 

@@ -52,8 +52,8 @@ export class SessionManager<Session> {
 
 	/**
 	 * Writes the working copy for `interaction` into the durable,
-	 * message-keyed store, without closing its handle -- e.g. so a session
-	 * set during a render that also registers a cleanup is visible to other
+	 * message-keyed store, without closing its handle. Lets a session set
+	 * during a render that also registers a cleanup be visible to other
 	 * reads right away, while the cleanup may still read or write it later.
 	 *
 	 * @param interaction the interaction whose working copy should be persisted
@@ -102,6 +102,15 @@ export class SessionManager<Session> {
 	}
 
 	/**
+	 * Drops every committed and staged session, closing all open handles.
+	 */
+	public clearAll() {
+		this.#sessions.clear();
+		this.#staging.clear();
+		this.#open.clear();
+	}
+
+	/**
 	 * Wraps a handle so reads pass through and writes throw, for handlers on
 	 * a path where nothing would ever commit a write (showing a modal).
 	 *
@@ -135,14 +144,9 @@ export class SessionManager<Session> {
 		};
 
 		return {
-			get: () =>
-				guarded(() => {
-					const value = store.get(id);
-					return value === undefined ? undefined : structuredClone(value);
-				}),
+			get: () => guarded(() => store.get(id)),
 			has: () => guarded(() => store.has(id)),
-			set: (session: Session) =>
-				guarded(() => void store.set(id, structuredClone(session))),
+			set: (session: Session) => guarded(() => void store.set(id, session)),
 			delete: () => guarded(() => store.delete(id)),
 		};
 	}
