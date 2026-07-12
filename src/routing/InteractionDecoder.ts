@@ -47,7 +47,19 @@ export class InteractionDecoder {
 				}).toString(),
 			};
 		} else if (interaction.isAnySelectMenu()) {
-			if (interaction.values.length === 0) return false;
+			if (interaction.values.length === 0) {
+				try {
+					return {
+						method: decodedPath.method,
+						path: this.#fillParams(decodedPath.path, {
+							ts: interaction.createdTimestamp.toString(),
+						}).toString(),
+						values: [],
+					};
+				} catch {
+					return false;
+				}
+			}
 
 			if (interaction.isStringSelectMenu()) {
 				const decodedOptions = interaction.values

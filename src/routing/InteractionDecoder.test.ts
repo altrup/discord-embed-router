@@ -99,7 +99,7 @@ test("decode() decodes a modal submission's customId the same way as a button's"
 	});
 });
 
-test("decode() returns false for a select menu with no selected values", () => {
+test("decode() returns false for an empty select menu whose pattern needs a selected value", () => {
 	const encoder = new HashEncoder();
 	encoder.registerPath("/*to");
 	const customId = encoder.encodePath("/*to", {
@@ -108,9 +108,57 @@ test("decode() returns false for a select menu with no selected values", () => {
 	});
 
 	const decoder = new InteractionDecoder(encoder);
-	const interaction = mockSelectMenuInteraction({ customId, values: [] });
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [],
+		isStringSelectMenu: () => true,
+	});
 
 	expect(decoder.decode(interaction, ID_PREFIX)).toBe(false);
+});
+
+test("decode() routes an empty user select menu to its own pattern with empty values", () => {
+	const encoder = new HashEncoder();
+	encoder.registerPath("/members");
+	const customId = encoder.encodePath("/members", {
+		method: "POST",
+		idPrefix: ID_PREFIX,
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [],
+		isUserSelectMenu: () => true,
+	});
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "POST",
+		path: "/members",
+		values: [],
+	});
+});
+
+test("decode() routes an empty string select menu to its pattern method with empty values", () => {
+	const encoder = new HashEncoder();
+	encoder.registerPath("/roles/remove");
+	const customId = encoder.encodePath("/roles/remove", {
+		method: "POST",
+		idPrefix: ID_PREFIX,
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [],
+		isStringSelectMenu: () => true,
+	});
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "POST",
+		path: "/roles/remove",
+		values: [],
+	});
 });
 
 test("decode() fills :to on a string select menu from the chosen value's path", () => {
