@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-12
+
 ### Changed
 
-- Empty select menu submits (deselecting every value) now route to their handler with an empty `values` array, instead of being ignored. Routes whose pattern consumes a selected value (e.g. `/*to`) still ignore empty submits, since there is no value to fill the pattern with.
+- Empty select menu submits (deselecting every value) now route to their handler with an empty `values` array, instead of being ignored. Routes whose pattern consumes a selected value (e.g. `/*to`) still ignore empty submits, since there is no value to fill the pattern with; use an optional param (e.g. `/{*to}`, `/users{/:userId}`) to receive empty submits on those routes too.
 
 ## [1.0.0] - 2026-07-11
 
@@ -22,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/altrup/discord-embed-router/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/altrup/discord-embed-router/releases/tag/v1.0.0
 
 ## Earlier versions
