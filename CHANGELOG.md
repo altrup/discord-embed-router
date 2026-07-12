@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Empty select menu submits (deselecting every value) now route to their handler with an empty `values` array, instead of being ignored. Routes whose pattern consumes a selected value (e.g. `/*to`) still ignore empty submits, since there is no value to fill the pattern with.
+
 ## [1.0.0] - 2026-07-11
 
 ### Added
