@@ -119,6 +119,10 @@ Full type-level documentation is available via your editor's hover/autocomplete 
 - `Encoder`, `HashEncoder`
 - `ConfigError`
 
+## Changelog
+
+Notable changes per release are documented in the [changelog](CHANGELOG.md).
+
 ## License
 
 MIT
