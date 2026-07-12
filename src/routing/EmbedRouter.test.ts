@@ -9,6 +9,7 @@ import { HashEncoder } from "@encoding/HashEncoder";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { Method, RouteOptionsWithMethod } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
+import { KEY_QUERY_PARAM } from "@src/consts";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;
 
@@ -1084,6 +1085,16 @@ test("encodePath's key option disambiguates otherwise identical customIds", () =
 	expect(embedRouter.encodePath("/same", { method: "GET", key: "a" })).toBe(a);
 });
 
+test("a key costs only itself plus three chars of customId budget", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	const plain = embedRouter.encodePath("/same", { method: "GET" });
+	const keyed = embedRouter.encodePath("/same", { method: "GET", key: "ab" });
+
+	// "?" + the one-char key param + "=" + the key itself
+	expect(keyed.length).toBe(plain.length + 3 + "ab".length);
+});
+
 test("a keyed component routes normally and its handler never sees the key", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -1114,7 +1125,7 @@ test("encodePath rejects queryParams that use the reserved key param", () => {
 	expect(() =>
 		embedRouter.encodePath("/test", {
 			method: "GET",
-			queryParams: { _k: "x" },
+			queryParams: { [KEY_QUERY_PARAM]: "x" },
 		}),
 	).toThrow(ConfigError);
 });

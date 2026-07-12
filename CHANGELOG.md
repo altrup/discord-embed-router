@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A `key` option on every component builder's `toOptions`/`patternOptions` (and on `encodePath`). Like React's `key` prop, it disambiguates components that would otherwise encode identical `customId`s, which Discord rejects within one message. The key rides in the reserved `_k` query param and is stripped before route matching, so handlers never see it; user query params named `_k` are rejected with a `ConfigError`.
+- A `key` option on every component builder's `toOptions`/`patternOptions` (and on `encodePath`). Like React's `key` prop, it disambiguates components that would otherwise encode identical `customId`s, which Discord rejects within one message. The key rides in a reserved query param (named by the PUA character `U+E000`, so it costs `key.length + 3` chars of customId budget) and is stripped before route matching, so handlers never see it; user query params with that name are rejected with a `ConfigError`.
+
+### Changed
+
+- Query params in `customId`s are serialized compactly: only characters that would corrupt parsing (`%`, `&`, `=`, `+`, `#`, tab, newline, carriage return) are percent-encoded, everything else is emitted raw instead of form-urlencoded (e.g. `q=:ts` was `q=%3Ats`, and non-ASCII values no longer triple in size). Decoding is unchanged, so `customId`s minted by earlier versions still route.
 
 ## [1.1.0] - 2026-07-12
 

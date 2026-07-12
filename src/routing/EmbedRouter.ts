@@ -655,7 +655,8 @@ export class EmbedRouter<
 		const mergedQueryParams = new URLSearchParams(queryParams);
 		if (mergedQueryParams.has(KEY_QUERY_PARAM))
 			throw new ConfigError(
-				`Query param "${KEY_QUERY_PARAM}" is reserved for carrying the key option; pass key instead`,
+				// name the param by codepoint since the PUA char renders invisibly
+				`Query param U+${KEY_QUERY_PARAM.codePointAt(0)!.toString(16).toUpperCase()} is reserved for carrying the key option; pass key instead`,
 				{ method, path },
 			);
 		if (key !== undefined) mergedQueryParams.append(KEY_QUERY_PARAM, key);

@@ -3,6 +3,19 @@ import { parse, stringify, Token } from "path-to-regexp";
 // base url is never sent; only used for processing locally
 const BASE_URL = "discord://embed.router";
 
+// only what breaks the parse round trip needs escaping: "&"/"=" delimit
+// entries, "%" starts an escape, "+" parses back as a space, "#" starts a URL
+// fragment, and tab/newline/CR are silently stripped by the URL parser.
+// Everything else stays raw to conserve Discord's 100-char customId budget.
+const QUERY_ESCAPE_PATTERN = /[%&=+#\t\n\r]/g;
+const escapeQueryComponent = (component: string) =>
+	component.replace(
+		QUERY_ESCAPE_PATTERN,
+		// all escaped chars are ASCII, so one %XX byte each
+		(char) =>
+			`%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+	);
+
 // kinda like a URL but no base_url
 export class Location {
 	public pathname: string;
@@ -15,7 +28,12 @@ export class Location {
 
 	public queryParams: URLSearchParams;
 	get query() {
-		const query = this.queryParams.toString();
+		const query = [...this.queryParams]
+			.map(
+				([key, value]) =>
+					`${escapeQueryComponent(key)}=${escapeQueryComponent(value)}`,
+			)
+			.join("&");
 		return query.length > 0 ? `?${query}` : "";
 	}
 	set query(query: string) {
