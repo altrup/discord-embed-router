@@ -1,5 +1,3 @@
-import { join } from "node:path";
-
 import {
 	RouteButtonBuilder,
 	RouteHandler,
@@ -19,6 +17,8 @@ export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
 		typeof userId === "string"
 			? await interaction.client.users.fetch(userId)
 			: null;
+	// path with the trailing /:userId segment (if any) removed
+	const basePath = userId ? path.slice(0, path.lastIndexOf("/")) : path;
 
 	return {
 		embeds: [
@@ -49,7 +49,8 @@ export const userInfo: RouteHandler<"GET", Globals, Session, Locals> = async (
 			new ActionRowBuilder()
 				.addComponents(
 					new RouteUserSelectMenuBuilder(embedRouter)
-						.setPattern(join(path.replace(userId ?? "", ""), ":userId"))
+						.setPattern(`${basePath}{/:userId}`)
+						.setMinValues(0)
 						.setPlaceholder("Choose a user")
 						.setDefaultUsers(userId ? [userId] : []),
 				)
