@@ -3,16 +3,16 @@
 [![npm version](https://img.shields.io/npm/v/discord-embed-router.svg?maxAge=3600)](https://www.npmjs.com/package/discord-embed-router)
 [![license](https://img.shields.io/npm/l/discord-embed-router.svg?maxAge=3600)](LICENSE)
 
-An [Express](https://expressjs.com)-inspired, URL-path-based router for [discord.js](https://discord.js.org) interactions. Define routes once, render an embed for each, and get buttons/select menus/modals that "link" to them for free — no more hand-rolled `customId` parsing.
+An [Express](https://expressjs.com)-inspired, URL-path-based router for [discord.js](https://discord.js.org) interactions. Define routes once, render an embed for each, and get buttons/select menus/modals that "link" to them for free: no more hand-rolled `customId` parsing.
 
 ## Why
 
 Handling Discord message components usually means switching on `customId` strings by hand, threading state through them yourself, and hoping two features never pick the same prefix. `discord-embed-router` treats your bot's UI like a tiny web app instead:
 
-- **Routes** — register a path (`/catalog/:id`) and a handler that returns the embed/components to render, the same way you'd write an Express route and its response.
-- **Component builders** — `RouteButtonBuilder`, `RouteStringSelectMenuBuilder`, `RouteModalBuilder`, etc. encode the destination path/query into the component's `customId` for you.
-- **Sessions** — attach per-message state that persists across clicks without you managing a cache.
-- **Cleanup/timeout** — declare what a stale component should turn into once its window expires.
+- **Routes**: register a path (`/catalog/:id`) and a handler that returns the embed/components to render, the same way you'd write an Express route and its response.
+- **Component builders**: `RouteButtonBuilder`, `RouteStringSelectMenuBuilder`, `RouteModalBuilder`, etc. encode the destination path/query into the component's `customId` for you.
+- **Sessions**: attach per-message state that persists across clicks without you managing a cache.
+- **Cleanup/timeout**: declare what a stale component should turn into once its window expires.
 
 ## Install
 
@@ -20,7 +20,7 @@ Handling Discord message components usually means switching on `customId` string
 npm install discord-embed-router discord.js
 ```
 
-`discord.js` is a peer dependency — you bring your own compatible version (see `peerDependencies` in [`package.json`](package.json) for the supported range).
+`discord.js` is a peer dependency: you bring your own compatible version (see `peerDependencies` in [`package.json`](package.json) for the supported range).
 
 ## Quick start
 
@@ -86,7 +86,7 @@ See [`examples/basic-bot`](examples/basic-bot) for a full bot with multiple rout
 
 `router.get/post/put/patch/delete(path, handler)` registers a handler for a path, using [`path-to-regexp`](https://github.com/pillarjs/path-to-regexp) syntax for params (`/user/:id`). `router.modal(path, handler)` registers a handler that returns a modal to show instead of editing the message. A `GET` handler's return value is the new message content; other methods must return a `redirect` (to a registered `GET` path) or `undefined` (silent ack).
 
-When one path implements several methods, `router.route(path, handlers)` registers them all at once from an object keyed by lowercase method — handy when a module already exports its handlers that way:
+When one path implements several methods, `router.route(path, handlers)` registers them all at once from an object keyed by lowercase method, which is handy when a module already exports its handlers that way:
 
 ```ts
 router.route("/counter", { get, post, modal } satisfies RouteHandlers<...>);
@@ -104,7 +104,7 @@ Pass a `Session` type parameter to `EmbedRouter<Globals, Session, Locals>` and u
 
 ### Cleanup and timeouts
 
-A `GET` handler can return `{ cleanup, timeout }` alongside its content. If no further interaction lands on that message before `timeout` ms, `cleanup` runs and its return value (if any) is applied to the message — handy for expiring a form or disabling stale buttons.
+A `GET` handler can return `{ cleanup, timeout }` alongside its content. If no further interaction lands on that message before `timeout` ms, `cleanup` runs and its return value (if any) is applied to the message, which is handy for expiring a form or disabling stale buttons.
 
 ### Encoding
 
