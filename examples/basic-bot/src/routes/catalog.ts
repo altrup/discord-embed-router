@@ -36,6 +36,10 @@ export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
 								.setDescription("View someone's user info")
 								.setTo(join(path, "user-info")),
 							new RouteStringSelectMenuOptionBuilder(embedRouter)
+								.setLabel("Profile")
+								.setDescription("Persistent per-user data through locals")
+								.setTo(join(path, "profile")),
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
 								.setLabel("Timer")
 								.setDescription("A sample timer page")
 								.setTo(join(path, "timer")),

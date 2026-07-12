@@ -1,4 +1,6 @@
 // data is updated basically in every file
+import { join } from "node:path";
+
 import { commands as commandsArray } from "@commands";
 import {
 	CommandImplementation,
@@ -15,6 +17,7 @@ import {
 	MessageFlags,
 } from "discord.js";
 
+import { ProfileStore } from "@lib/profile-store";
 import { Globals, Locals, Session } from "@routes/types";
 
 const client = new Client({
@@ -27,6 +30,12 @@ const router = new EmbedRouter<Globals, Session, Locals>(client);
 // listen to discord-embed-router errors and warnings
 router.onError(console.error);
 process.on("warning", console.error);
+
+// inject persistent-data access into every route via state.locals; the
+// provider must be synchronous, so it hands routes the store itself and
+// they await their own queries
+const profileStore = new ProfileStore(join(__dirname, "../profiles.json"));
+router.setLocalsProvider(() => ({ profiles: profileStore }));
 
 registerRoutes(router);
 

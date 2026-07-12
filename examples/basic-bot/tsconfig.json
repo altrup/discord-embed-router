@@ -11,7 +11,7 @@
 			"@commands": ["./src/commands"],
 			"@routes/*": ["./src/routes/*"],
 			"@routes": ["./src/routes"],
-			"@games/*": ["./src/games/*"]
+			"@lib/*": ["./src/lib/*"]
 		},
 		"ignoreDeprecations": "6.0",
 

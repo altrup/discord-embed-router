@@ -7,12 +7,13 @@ It registers two slash commands:
 - `/help`: a minimal single-route page.
 - `/catalog`: a browsable catalog of demo pages, each showing a different feature:
 
-| Page        | Demonstrates                                                                                               |
-| ----------- | ---------------------------------------------------------------------------------------------------------- |
-| Counter     | Sessions, `POST`/`PUT` mutations with redirects, and a modal for direct input (`routes/counter.ts`)        |
-| User info   | Path params (`/user-info/{:userId}`) and select menu builders (`routes/user-info.ts`)                      |
-| Timer       | Cleanup/timeout turning a stale message into an expired state (`routes/timer.ts`)                          |
-| Tic-tac-toe | A multi-method page registered with `router.route()`, driven entirely by buttons (`routes/tic-tac-toe.ts`) |
+| Page        | Demonstrates                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------- |
+| Counter     | Sessions, `POST`/`PUT` mutations with redirects, and a modal for direct input (`routes/counter.ts`)             |
+| User info   | Path params (`/user-info/{:userId}`) and select menu builders (`routes/user-info.ts`)                           |
+| Profile     | Persistent per-user data injected through `setLocalsProvider` (`routes/profile.ts`, `src/lib/profile-store.ts`) |
+| Timer       | Cleanup/timeout turning a stale message into an expired state (`routes/timer.ts`)                               |
+| Tic-tac-toe | A multi-method page registered with `router.route()`, driven entirely by buttons (`routes/tic-tac-toe.ts`)      |
 
 Route wiring lives in [`src/routes/index.ts`](src/routes/index.ts), including a nested router mounted at `/catalog`.
 

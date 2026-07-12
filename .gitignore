@@ -141,3 +141,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# example bot's demo profile store
+examples/basic-bot/profiles.json

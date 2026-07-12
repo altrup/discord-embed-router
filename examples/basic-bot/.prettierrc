@@ -6,7 +6,7 @@
 		"",
 		"<THIRD_PARTY_MODULES>",
 		"",
-		"^@(@command|config|routes|games)/",
+		"^@(@command|config|routes|lib)/",
 		"",
 		"^[./]"
 	]

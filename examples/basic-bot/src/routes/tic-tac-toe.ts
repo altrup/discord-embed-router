@@ -3,8 +3,8 @@ import { RouteButtonBuilder } from "discord-embed-router";
 import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { Path } from "path-to-regexp";
 
-import type { Cell } from "@games/tic-tac-toe-board";
-import { TicTacToeBoard } from "@games/tic-tac-toe-board";
+import type { Cell } from "@lib/tic-tac-toe-board";
+import { TicTacToeBoard } from "@lib/tic-tac-toe-board";
 import type { Globals, Locals, Session } from "@routes/types";
 import { DEFAULT_TIMEOUT } from "@routes/types";
 

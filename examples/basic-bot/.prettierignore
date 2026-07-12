@@ -144,3 +144,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# demo profile store written at runtime
+profiles.json
