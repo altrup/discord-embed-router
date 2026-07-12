@@ -5,7 +5,7 @@ import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { isMethod } from "@helpers/isMethod";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
-import { RouteOptionsWithMethod } from "@routing/types";
+import { ComponentKeyOption, RouteOptionsWithMethod } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
@@ -31,7 +31,7 @@ export class RouteModalBuilder<
 			"custom_id" | "customId"
 		> & {
 			to?: P | undefined;
-			toOptions?: RouteOptionsWithMethod | undefined;
+			toOptions?: (RouteOptionsWithMethod & ComponentKeyOption) | undefined;
 		},
 	) {
 		const { to, toOptions, ...rest } = data ?? {};
@@ -64,14 +64,19 @@ export class RouteModalBuilder<
 	 * @param method method to send to route; required because a submission's
 	 * target is wherever it gets processed, so there's no sane default
 	 * @param queryParams any query parameters you want to add, can include :ts
+	 * @param key disambiguates components that would otherwise get identical
+	 * customIds, which Discord rejects within one message
 	 */
-	public setTo(path: P, { method, queryParams }: RouteOptionsWithMethod): this {
+	public setTo(
+		path: P,
+		{ method, queryParams, key }: RouteOptionsWithMethod & ComponentKeyOption,
+	): this {
 		// only reachable by a JS caller (or an `as any`) bypassing the type:
 		// discord.js has no showModal on ModalSubmitInteraction
 		if (!isMethod(method))
 			throw new ConfigError(`Invalid method "${method}" for RouteModalBuilder`);
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, { method, queryParams }),
+			this.#embedRouter.encodePath(path, { method, queryParams, key }),
 		);
 		return this;
 	}

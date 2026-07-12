@@ -1,5 +1,9 @@
 export const ID_PREFIX = "der";
 
+// query param that carries a component's `key` option inside its customId;
+// reserved: user queryParams can't use it, and it's stripped before routing
+export const KEY_QUERY_PARAM = "_k";
+
 export const PUA_START = 0xe000;
 export const PUA_END = 0xf8ff;
 export const PUA_RANGE = PUA_END - PUA_START + 1;

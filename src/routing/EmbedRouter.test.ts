@@ -1071,6 +1071,54 @@ test("route() rejects unknown method keys at the type level and registers nothin
 	).toThrow(ConfigError);
 });
 
+test("encodePath's key option disambiguates otherwise identical customIds", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	const plain = embedRouter.encodePath("/same", { method: "GET" });
+	const a = embedRouter.encodePath("/same", { method: "GET", key: "a" });
+	const b = embedRouter.encodePath("/same", { method: "GET", key: "b" });
+
+	expect(a).not.toBe(plain);
+	expect(a).not.toBe(b);
+	// same inputs stay deterministic across builds
+	expect(embedRouter.encodePath("/same", { method: "GET", key: "a" })).toBe(a);
+});
+
+test("a keyed component routes normally and its handler never sees the key", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn().mockReturnValue({});
+	embedRouter.get("/test/:id", handler);
+
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(
+			embedRouter.encodePath("/test/7", {
+				method: "GET",
+				queryParams: { test: "3" },
+				key: "top",
+			}),
+		),
+	);
+
+	await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+	const [, , state] = handler.mock.calls[0]!;
+	expect(state.params).toEqual({ id: "7" });
+	expect([...state.queryParams.keys()]).toEqual(["test"]);
+});
+
+test("encodePath rejects queryParams that use the reserved key param", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	expect(() =>
+		embedRouter.encodePath("/test", {
+			method: "GET",
+			queryParams: { _k: "x" },
+		}),
+	).toThrow(ConfigError);
+});
+
 test("route() throws a ConfigError naming any unknown handler key, even alongside valid ones", () => {
 	const embedRouter = new EmbedRouter(mockClient());
 

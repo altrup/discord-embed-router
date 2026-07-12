@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `key` option on every component builder's `toOptions`/`patternOptions` (and on `encodePath`). Like React's `key` prop, it disambiguates components that would otherwise encode identical `customId`s, which Discord rejects within one message. The key rides in the reserved `_k` query param and is stripped before route matching, so handlers never see it; user query params named `_k` are rejected with a `ConfigError`.
+
 ## [1.1.0] - 2026-07-12
 
 ### Changed

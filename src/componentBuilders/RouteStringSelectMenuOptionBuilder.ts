@@ -7,7 +7,7 @@ import { Path } from "path-to-regexp";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { isMethod } from "@helpers/isMethod";
 import type { EmbedRouter } from "@routing/EmbedRouter";
-import { RouteOptions } from "@routing/types";
+import { ComponentKeyOption, RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
@@ -33,7 +33,7 @@ export class RouteStringSelectMenuOptionBuilder<
 		data?: Omit<SelectMenuComponentOptionData, "value" | "label"> & {
 			label: string;
 			to: P;
-			toOptions?: RouteOptions<true, true> | undefined;
+			toOptions?: (RouteOptions<true, true> & ComponentKeyOption) | undefined;
 		},
 	) {
 		const { to, toOptions, label, ...rest } = data ?? {};
@@ -62,10 +62,16 @@ export class RouteStringSelectMenuOptionBuilder<
 	 * @param method method to send to route; defaults to empty, which defers
 	 * to whatever method the containing RouteStringSelectMenuBuilder's pattern
 	 * encodes. Set this to override the method for just this option.
+	 * @param key disambiguates options that would otherwise get identical
+	 * values, which Discord rejects within one select menu
 	 */
 	public setTo(
 		path: P,
-		{ method = "", queryParams }: RouteOptions<true, true> = {},
+		{
+			method = "",
+			queryParams,
+			key,
+		}: RouteOptions<true, true> & ComponentKeyOption = {},
 	): this {
 		// only reachable by a JS caller (or an `as any`) bypassing the type
 		if (!isMethod(method, { allowModal: true, allowEmpty: true }))
@@ -77,6 +83,7 @@ export class RouteStringSelectMenuOptionBuilder<
 				idPrefix: "",
 				method: method,
 				queryParams,
+				key,
 			}),
 		);
 

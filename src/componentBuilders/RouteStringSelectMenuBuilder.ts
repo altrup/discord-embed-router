@@ -9,7 +9,7 @@ import { Path } from "path-to-regexp";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import { RouteStringSelectMenuOptionBuilder } from "@componentBuilders/RouteStringSelectMenuOptionBuilder";
 import type { EmbedRouter } from "@routing/EmbedRouter";
-import { RouteOptions } from "@routing/types";
+import { ComponentKeyOption, RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
@@ -34,7 +34,7 @@ export class RouteStringSelectMenuBuilder<
 		embedRouter: EmbedRouter<Globals, Session, Locals>,
 		data?: Omit<StringSelectMenuComponentData, "customId" | "options"> & {
 			pattern?: P | undefined;
-			patternOptions?: RouteOptions<true> | undefined;
+			patternOptions?: (RouteOptions<true> & ComponentKeyOption) | undefined;
 			tos: readonly RouteStringSelectMenuOptionBuilder<
 				Globals,
 				Session,
@@ -149,13 +149,19 @@ export class RouteStringSelectMenuBuilder<
 	 * @param path the path to redirect to, can include :ts *to
 	 * @param queryParams any query parameters you want to add, can include :ts *to
 	 * @param method method to send to route
+	 * @param key disambiguates components that would otherwise get identical
+	 * customIds, which Discord rejects within one message
 	 */
 	public setPattern(
 		path: P,
-		{ method = "GET", queryParams }: RouteOptions<true> = {},
+		{
+			method = "GET",
+			queryParams,
+			key,
+		}: RouteOptions<true> & ComponentKeyOption = {},
 	) {
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, { method, queryParams }),
+			this.#embedRouter.encodePath(path, { method, queryParams, key }),
 		);
 		return this;
 	}

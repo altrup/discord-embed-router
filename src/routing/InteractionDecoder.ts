@@ -4,6 +4,7 @@ import { compile } from "path-to-regexp";
 import type { Encoder } from "@encoding/Encoder";
 import { Location } from "@helpers/Location";
 import type { Method } from "@routing/types";
+import { KEY_QUERY_PARAM } from "@src/consts";
 
 /**
  * Turns a discord.js component or modal submit interaction that came from one
@@ -128,6 +129,9 @@ export class InteractionDecoder {
 		queryParams = params,
 	): Location {
 		const location = new Location(path);
+		// the key already did its job (making the customId unique within the
+		// message); drop it so handlers and select menu values never see it
+		location.queryParams.delete(KEY_QUERY_PARAM);
 		const toPath = compile(location.pathname);
 
 		location.pathname = toPath(params);

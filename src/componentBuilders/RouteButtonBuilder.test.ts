@@ -1,6 +1,6 @@
 import EventEmitter from "node:events";
 
-import { Client } from "discord.js";
+import { ButtonStyle, Client } from "discord.js";
 import { expect, test } from "vitest";
 
 import { RouteButtonBuilder } from "@componentBuilders/RouteButtonBuilder";
@@ -20,4 +20,21 @@ test("setTo allows a non-MODAL method", () => {
 	const button = new RouteButtonBuilder(embedRouter);
 
 	expect(() => button.setTo("/x", { method: "GET" })).not.toThrow();
+});
+
+test("two buttons to the same route with different keys get distinct customIds", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	const [a, b] = ["a", "b"].map((key) => {
+		const json = new RouteButtonBuilder(embedRouter, {
+			label: "x",
+			style: ButtonStyle.Primary,
+			to: "/same",
+			toOptions: { key },
+		}).toJSON();
+		return "custom_id" in json ? json.custom_id : undefined;
+	});
+
+	expect(a).toBeDefined();
+	expect(a).not.toBe(b);
 });

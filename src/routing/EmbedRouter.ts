@@ -23,6 +23,7 @@ import { MessageQueue } from "@routing/MessageQueue";
 import { RouteRegistry } from "@routing/RouteRegistry";
 import type {
 	Args,
+	ComponentKeyOption,
 	EventNames,
 	ExtractParams,
 	Listener,
@@ -37,7 +38,7 @@ import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler } from "@sessions/types";
 import { ConfigError, RouteNotFoundError } from "@src/ConfigError";
-import { ID_PREFIX } from "@src/consts";
+import { ID_PREFIX, KEY_QUERY_PARAM } from "@src/consts";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
@@ -632,10 +633,12 @@ export class EmbedRouter<
 		{
 			method,
 			queryParams,
+			key,
 			idPrefix = this.idPrefix,
-		}: RouteOptionsWithMethod<AllowModalMethod, AllowEmptyMethod> & {
-			idPrefix?: string | undefined;
-		},
+		}: RouteOptionsWithMethod<AllowModalMethod, AllowEmptyMethod> &
+			ComponentKeyOption & {
+				idPrefix?: string | undefined;
+			},
 	) {
 		this.#assertAlive();
 		if (!this.#client)
@@ -649,10 +652,18 @@ export class EmbedRouter<
 		if (method !== "" && !isMethod(method, { allowModal: true }))
 			throw new ConfigError(`Invalid method "${method}"`, { method, path });
 
+		const mergedQueryParams = new URLSearchParams(queryParams);
+		if (mergedQueryParams.has(KEY_QUERY_PARAM))
+			throw new ConfigError(
+				`Query param "${KEY_QUERY_PARAM}" is reserved for carrying the key option; pass key instead`,
+				{ method, path },
+			);
+		if (key !== undefined) mergedQueryParams.append(KEY_QUERY_PARAM, key);
+
 		return this.#encoder.encodePath(path, {
 			idPrefix,
 			method,
-			queryParams,
+			queryParams: mergedQueryParams,
 		});
 	}
 

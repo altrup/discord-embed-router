@@ -26,6 +26,7 @@ export type {
 	Method,
 	RouteOptions,
 	RouteOptionsWithMethod,
+	ComponentKeyOption,
 	ExtractParams,
 } from "@routing/types";
 

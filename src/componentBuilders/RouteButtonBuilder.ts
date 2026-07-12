@@ -4,7 +4,7 @@ import { Path } from "path-to-regexp";
 import { rejectKeys } from "@componentBuilders/rejectKeys";
 import type { DistributiveOmit } from "@helpers/types";
 import type { EmbedRouter } from "@routing/EmbedRouter";
-import { RouteOptions } from "@routing/types";
+import { ComponentKeyOption, RouteOptions } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
 
 // path params this builder embeds into paths handed to encodePath
@@ -30,7 +30,7 @@ export class RouteButtonBuilder<
 			"custom_id" | "customId" | "url"
 		> & {
 			to?: P | undefined;
-			toOptions?: RouteOptions<true> | undefined;
+			toOptions?: (RouteOptions<true> & ComponentKeyOption) | undefined;
 		},
 	) {
 		const { to, toOptions, ...rest } = data ?? {};
@@ -65,13 +65,19 @@ export class RouteButtonBuilder<
 	 * @param path the path to route to, can include :ts
 	 * @param queryParams any query parameters you want to add, can include :ts
 	 * @param method method to send to route
+	 * @param key disambiguates components that would otherwise get identical
+	 * customIds, which Discord rejects within one message
 	 */
 	public setTo(
 		path: P,
-		{ method = "GET", queryParams }: RouteOptions<true> = {},
+		{
+			method = "GET",
+			queryParams,
+			key,
+		}: RouteOptions<true> & ComponentKeyOption = {},
 	): this {
 		super.setCustomId(
-			this.#embedRouter.encodePath(path, { method, queryParams }),
+			this.#embedRouter.encodePath(path, { method, queryParams, key }),
 		);
 		return this;
 	}

@@ -157,6 +157,11 @@ export type RouteOptions<
 		| (AllowEmptyMethod extends true ? "" : never);
 	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
 };
+// `key` distinguishes components that would otherwise encode identical
+// customIds, which Discord rejects within one message (like React's key
+// prop). It rides in a reserved query param and is stripped before route
+// matching, so handlers never see it.
+export type ComponentKeyOption = { key?: string | undefined };
 export type RouteOptionsWithMethod<
 	AllowModalMethod extends boolean = false,
 	AllowEmptyMethod extends boolean = false,
