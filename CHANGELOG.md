@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-12
+
 ### Added
 
-- A `key` option on every component builder's `toOptions`/`patternOptions` (and on `encodePath`). Like React's `key` prop, it disambiguates components that would otherwise encode identical `customId`s, which Discord rejects within one message. The key rides in a reserved query param (named by the PUA character `U+E000`, so it costs `key.length + 3` chars of customId budget) and is stripped before route matching, so handlers never see it; user query params with that name are rejected with a `ConfigError`.
+- A `key` option on every component builder's `toOptions`/`patternOptions` (and on `encodePath`). Like React's `key` prop, it disambiguates components that would otherwise encode identical `customId`s, which Discord rejects within one message. The key rides in a reserved query param (named by the PUA character `U+E000`, so it costs `key.length + 3` chars of customId budget) and is stripped before route matching, so handlers never see it; user query params with that name are rejected with a `ConfigError`. Note that only 1.2.0+ strips the param: a bot rolled back to an older version passes it through to handlers of keyed components.
 
 ### Changed
 
@@ -32,7 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/altrup/discord-embed-router/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/altrup/discord-embed-router/releases/tag/v1.0.0
 
