@@ -80,13 +80,15 @@ export class InteractionDecoder {
 				// query params; every option's destination is still available
 				// via state.values for handlers that need the rest
 				const firstToLocation = toLocations[0];
+				const toSegments = firstToLocation?.pathname
+					.split("/")
+					.filter((s) => s.length > 0);
 				const pathLocation = this.#fillParams(
 					decodedPath.path,
 					{
 						ts: interaction.createdTimestamp.toString(),
-						to: firstToLocation?.pathname
-							.split("/")
-							.filter((s) => s.length > 0),
+						// path-to-regexp throws on [], not just missing, for a wildcard param
+						to: toSegments?.length ? toSegments : undefined,
 					},
 					{
 						ts: interaction.createdTimestamp.toString(),

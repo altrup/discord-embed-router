@@ -188,6 +188,33 @@ test("decode() fills :to on a string select menu from the chosen value's path", 
 	});
 });
 
+test("decode() fills *to on a string select menu when the chosen value's path is root", () => {
+	const encoder = new HashEncoder();
+	encoder.registerPath("/{*to}");
+	encoder.registerPath("/");
+	const customId = encoder.encodePath("/{*to}", {
+		method: "GET",
+		idPrefix: ID_PREFIX,
+	});
+	const value = encoder.encodePath<true>("/", {
+		method: "",
+		idPrefix: "",
+	});
+
+	const decoder = new InteractionDecoder(encoder);
+	const interaction = mockSelectMenuInteraction({
+		customId,
+		values: [value],
+		isStringSelectMenu: () => true,
+	});
+
+	expect(decoder.decode(interaction, ID_PREFIX)).toStrictEqual({
+		method: "GET",
+		path: "/",
+		values: ["/"],
+	});
+});
+
 test("decode() exposes every chosen value on a string select menu via values, using only the first for :to", () => {
 	const encoder = new HashEncoder();
 	encoder.registerPath("/multi/*to");

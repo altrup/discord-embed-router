@@ -57,7 +57,7 @@ export class RouteStringSelectMenuBuilder<
 			this.setPattern(pattern, patternOptions);
 		} else {
 			super.setCustomId(
-				this.#embedRouter.encodePath("/*to", {
+				this.#embedRouter.encodePath("/{*to}", {
 					method: "GET",
 				}),
 			);
