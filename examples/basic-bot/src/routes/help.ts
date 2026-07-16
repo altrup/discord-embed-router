@@ -18,11 +18,17 @@ export const help: RouteHandler<"GET", Globals, Session, Locals> = (
 			new EmbedBuilder()
 				.setColor("#b574c5")
 				.setTitle("Getting Started")
-				.setDescription("The example bot for discord-embed-builder")
-				.addFields({
-					name: "Counter",
-					value: `Use </catalog:${globals?.commandIds.get("catalog")}> to view a list of all commands`,
-				}),
+				.setDescription("The example bot for discord-embed-router")
+				.addFields(
+					{
+						name: "Catalog",
+						value: `Use </catalog:${globals?.commandIds.get("catalog")}> to browse the demo pages`,
+					},
+					{
+						name: "Suggest",
+						value: `Use </suggest:${globals?.commandIds.get("suggest")}> to try a command-launched modal`,
+					},
+				),
 		],
 		components: [
 			new ActionRowBuilder()

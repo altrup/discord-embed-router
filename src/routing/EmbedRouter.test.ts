@@ -1,6 +1,11 @@
 import EventEmitter from "node:events";
 
-import { ButtonInteraction, Client, ModalSubmitInteraction } from "discord.js";
+import {
+	ButtonInteraction,
+	Client,
+	MessageFlags,
+	ModalSubmitInteraction,
+} from "discord.js";
 import { Path, Token } from "path-to-regexp";
 import { expect, test, vi } from "vitest";
 
@@ -9,7 +14,7 @@ import { HashEncoder } from "@encoding/HashEncoder";
 import { EmbedRouter } from "@routing/EmbedRouter";
 import { Method, RouteOptionsWithMethod } from "@routing/types";
 import { ConfigError } from "@src/ConfigError";
-import { KEY_QUERY_PARAM } from "@src/consts";
+import { FLAGS_QUERY_PARAM, KEY_QUERY_PARAM } from "@src/consts";
 
 const mockClient = (): Client => new EventEmitter() as unknown as Client;
 
@@ -955,6 +960,138 @@ test("a modal submission dispatches into an ordinary route with state.fields set
 	const [, , state] = handler.mock.calls[0]!;
 	expect(state.params).toEqual({ id: "7" });
 	expect(state.fields.getTextInputValue()).toBe("typed value");
+});
+
+test("a modal's carried flags are applied when its submission creates the reply", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.post("/submit", () => ({ redirect: "/done" }));
+	const getHandler = vi.fn().mockReturnValue({ content: "done" });
+	embedRouter.get("/done", getHandler);
+
+	// modal submits shown from a slash command have no message
+	const interaction = mockModalSubmitInteraction(
+		embedRouter.encodePath("/submit", {
+			method: "POST",
+			flags: MessageFlags.Ephemeral,
+		}),
+		{ message: null } as unknown as Partial<ModalSubmitInteraction>,
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() =>
+		expect(interaction.reply).toHaveBeenCalledExactlyOnceWith({
+			content: "done",
+			flags: MessageFlags.Ephemeral,
+		}),
+	);
+	// the reserved flags param never reaches the handler
+	const [, , state] = getHandler.mock.calls[0]!;
+	expect([...state.queryParams.keys()]).toEqual([]);
+});
+
+test("a two-digit carried flags value round-trips through the customId", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.post("/submit", () => ({ redirect: "/done" }));
+	embedRouter.get("/done", () => ({ content: "done" }));
+
+	const allReplyFlags = [
+		MessageFlags.Ephemeral,
+		MessageFlags.SuppressEmbeds,
+		MessageFlags.SuppressNotifications,
+		MessageFlags.IsComponentsV2,
+	] as const;
+	const interaction = mockModalSubmitInteraction(
+		embedRouter.encodePath("/submit", {
+			method: "POST",
+			flags: allReplyFlags,
+		}),
+		{ message: null } as unknown as Partial<ModalSubmitInteraction>,
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() =>
+		expect(interaction.reply).toHaveBeenCalledExactlyOnceWith({
+			content: "done",
+			flags: allReplyFlags.reduce((bits, flag) => bits | flag, 0),
+		}),
+	);
+});
+
+test("carried flags are ignored when the submission edits the message its modal was launched from", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.post("/submit", () => ({ redirect: "/done" }));
+	embedRouter.get("/done", () => ({ content: "done" }));
+
+	const interaction = mockModalSubmitInteraction(
+		embedRouter.encodePath("/submit", {
+			method: "POST",
+			flags: MessageFlags.Ephemeral,
+		}),
+	);
+	client.emit("interactionCreate", interaction);
+
+	// update only exists on message-launched modal submits; the mock always
+	// provides it
+	const { update } = interaction as unknown as { update: () => void };
+	await vi.waitFor(() =>
+		expect(update).toHaveBeenCalledExactlyOnceWith({ content: "done" }),
+	);
+	expect(interaction.reply).not.toHaveBeenCalled();
+});
+
+test("carried flags cost one param char plus one digit per PUA_RANGE power", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	const plain = embedRouter.encodePath("/submit", { method: "POST" });
+	const flagged = embedRouter.encodePath("/submit", {
+		method: "POST",
+		flags: MessageFlags.Ephemeral,
+	});
+
+	// "?" + the one-char flags param + "=" + the one-digit value
+	expect(flagged.length).toBe(plain.length + 4);
+});
+
+test("encodePath rejects queryParams that use the reserved flags param", () => {
+	const embedRouter = new EmbedRouter(mockClient());
+
+	expect(() =>
+		embedRouter.encodePath("/test", {
+			method: "GET",
+			queryParams: { [FLAGS_QUERY_PARAM]: "x" },
+		}),
+	).toThrow(ConfigError);
+});
+
+test("dispatch with flags on a MODAL method throws, even past TypeScript", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.modal("/edit", () => ({
+		customId: "raw",
+		title: "Edit",
+		components: [],
+	}));
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/edit", {
+			method: "MODAL",
+			// @ts-expect-error flags are disallowed with MODAL dispatches
+			flags: [MessageFlags.Ephemeral],
+		}),
+	).rejects.toMatchObject({
+		cause: {
+			message: expect.stringContaining(
+				"You can not set flags when showing a modal",
+			),
+		},
+	});
 });
 
 test("componentBuilder params are registered automatically, giving them a compact encoding without an explicit route", () => {

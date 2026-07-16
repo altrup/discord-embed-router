@@ -2,9 +2,10 @@
 
 A Discord bot that showcases how to use [`discord-embed-router`](../..).
 
-It registers two slash commands:
+It registers three slash commands:
 
 - `/help`: a minimal single-route page.
+- `/suggest`: a command-launched modal that carries reply flags in its `setTo`, so its submission's reply is ephemeral (`routes/suggest.ts`).
 - `/catalog`: a browsable catalog of demo pages, each showing a different feature:
 
 | Page        | Demonstrates                                                                                                    |

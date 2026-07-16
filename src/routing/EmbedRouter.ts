@@ -6,6 +6,7 @@ import {
 	InteractionReplyOptions,
 	Message,
 	MessageFlags,
+	MessageFlagsBitField,
 } from "discord.js";
 import { Path } from "path-to-regexp";
 
@@ -16,7 +17,9 @@ import { isMethod } from "@helpers/isMethod";
 import { isSupportedInteraction } from "@helpers/isSupportedInteraction";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
+import { encodePuaNumber } from "@helpers/puaCodepoints";
 import { toError } from "@helpers/toError";
+import { REPLY_FLAGS } from "@routing/consts";
 import { IdentifierRegistry } from "@routing/IdentifierRegistry";
 import { InteractionDecoder } from "@routing/InteractionDecoder";
 import { MessageQueue } from "@routing/MessageQueue";
@@ -24,13 +27,14 @@ import { RouteRegistry } from "@routing/RouteRegistry";
 import type {
 	Args,
 	ComponentKeyOption,
+	DispatchOptions,
 	EventNames,
 	ExtractParams,
 	Listener,
 	LocalsProvider,
+	ReplyFlagsOption,
 	RouteHandler,
 	RouteHandlers,
-	RouteOptions,
 	RouteOptionsWithMethod,
 	Unused,
 } from "@routing/types";
@@ -38,7 +42,7 @@ import { CleanupManager } from "@sessions/CleanupManager";
 import { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler } from "@sessions/types";
 import { ConfigError, RouteNotFoundError } from "@src/ConfigError";
-import { ID_PREFIX, KEY_QUERY_PARAM } from "@src/consts";
+import { FLAGS_QUERY_PARAM, ID_PREFIX, KEY_QUERY_PARAM } from "@src/consts";
 
 type EmbedRouterEvents = {
 	routeError: [err: Error, interaction?: Interaction | undefined];
@@ -364,7 +368,7 @@ export class EmbedRouter<
 	 * @param path path to route the interaction to
 	 * @param method method to send to route
 	 * @param queryParams query params to merge into the path, same as encodePath's queryParams option
-	 * @param flags discord flags to send with message (optional, only allowed on first reply)
+	 * @param flags discord flags to send with message (optional, only allowed on first reply; disallowed with MODAL since modals accept no flags — carry them on the modal via RouteModalBuilder's setTo flags option instead)
 	 * @param locals additional info to pass in to page through state.local (optional)
 	 */
 	public async dispatch<P extends Path = Path>(
@@ -376,11 +380,7 @@ export class EmbedRouter<
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
 			values,
-		}: RouteOptions<true> & {
-			flags?: InteractionReplyOptions["flags"] | undefined;
-			locals?: Locals | undefined;
-			values?: string[] | undefined;
-		} = {},
+		}: DispatchOptions<Locals> = {},
 	) {
 		let message: Message | undefined;
 		if (this.#dispatchingInteractions.has(interaction))
@@ -423,9 +423,11 @@ export class EmbedRouter<
 
 			if ("modal" in resolved) {
 				if (resolved.modal) {
+					// only reachable by a JS caller (or an `as any`) bypassing the
+					// type: modals accept no flags at all
 					if (flags)
 						throw new ConfigError(
-							"You can not set flags when showing a modal",
+							"You can not set flags when showing a modal; carry them on the modal via RouteModalBuilder's setTo flags option",
 							{ method, path },
 						);
 					if (
@@ -594,7 +596,13 @@ export class EmbedRouter<
 					method: route.method,
 					locals: this.#localsProvider?.(this, interaction),
 					values: route.values,
-				});
+					// a dispatch with a message edits it, so carried flags
+					// (creation-time only) are dropped
+					flags: interaction.message
+						? undefined
+						: (route.flags as InteractionReplyOptions["flags"]),
+					// cast: the decoder never pairs flags with a MODAL method
+				} as DispatchOptions<Locals>);
 			});
 		} catch (e: unknown) {
 			// a stale/forged customId isn't a misconfiguration, so it's reported
@@ -620,6 +628,8 @@ export class EmbedRouter<
 	 * @param path raw unencoded path
 	 * @param method the html method to encode into the path
 	 * @param queryParams any query params to include in the encoded string
+	 * @param key disambiguates components that would otherwise get identical customIds
+	 * @param flags reply flags carried in the customId, applied when the component's dispatch creates the message (see ReplyFlagsOption)
 	 * @param idPrefix string to prefix the encoded path with (optional, defaults to this router's prefix)
 	 * @returns
 	 */
@@ -634,9 +644,11 @@ export class EmbedRouter<
 			method,
 			queryParams,
 			key,
+			flags,
 			idPrefix = this.idPrefix,
 		}: RouteOptionsWithMethod<AllowModalMethod, AllowEmptyMethod> &
-			ComponentKeyOption & {
+			ComponentKeyOption &
+			ReplyFlagsOption & {
 				idPrefix?: string | undefined;
 			},
 	) {
@@ -653,13 +665,29 @@ export class EmbedRouter<
 			throw new ConfigError(`Invalid method "${method}"`, { method, path });
 
 		const mergedQueryParams = new URLSearchParams(queryParams);
-		if (mergedQueryParams.has(KEY_QUERY_PARAM))
-			throw new ConfigError(
-				// name the param by codepoint since the PUA char renders invisibly
-				`Query param U+${KEY_QUERY_PARAM.codePointAt(0)!.toString(16).toUpperCase()} is reserved for carrying the key option; pass key instead`,
-				{ method, path },
-			);
+		for (const [param, option] of [
+			[KEY_QUERY_PARAM, "key"],
+			[FLAGS_QUERY_PARAM, "flags"],
+		] as const)
+			if (mergedQueryParams.has(param))
+				throw new ConfigError(
+					// name the param by codepoint since the PUA char renders invisibly
+					`Query param U+${param.codePointAt(0)!.toString(16).toUpperCase()} is reserved for carrying the ${option} option; pass ${option} instead`,
+					{ method, path },
+				);
 		if (key !== undefined) mergedQueryParams.append(KEY_QUERY_PARAM, key);
+		if (flags !== undefined) {
+			// the reply-flags resolvable is a subset of every message flag, but
+			// its BitField variant doesn't structurally satisfy the wider
+			// resolvable
+			const resolvable = flags as ConstructorParameters<
+				typeof MessageFlagsBitField
+			>[0];
+			const masked =
+				new MessageFlagsBitField(resolvable).bitfield & REPLY_FLAGS;
+			if (masked !== 0)
+				mergedQueryParams.append(FLAGS_QUERY_PARAM, encodePuaNumber(masked));
+		}
 
 		return this.#encoder.encodePath(path, {
 			idPrefix,

@@ -2,6 +2,7 @@ import {
 	APIModalInteractionResponseCallbackData,
 	Interaction,
 	InteractionEditReplyOptions,
+	InteractionReplyOptions,
 	ModalBuilder,
 	ModalComponentData,
 	ModalSubmitFields,
@@ -117,10 +118,6 @@ export type RouteHandlers<
 > = {
 	[M in Method as Lowercase<M>]?: RouteHandler<M, Globals, Session, Locals, P>;
 };
-export type SessionProvider<Globals, Session, Locals> = (
-	embedRouter: EmbedRouter<Globals, Session, Locals>,
-	interaction: Interaction,
-) => Session;
 export type LocalsProvider<Globals, Session, Locals> = (
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	interaction: Interaction,
@@ -162,6 +159,14 @@ export type RouteOptions<
 // prop). It rides in a reserved query param and is stripped before route
 // matching, so handlers never see it.
 export type ComponentKeyOption = { key?: string | undefined };
+// `flags` rides in a reserved query param and is applied as reply flags when
+// the component's dispatch creates the message (e.g. a command-launched
+// modal's submission); it's inert when the dispatch edits an existing
+// message, since creation-time flags can't change. Only RouteModalBuilder
+// exposes it: other components always live on a message
+export type ReplyFlagsOption = {
+	flags?: InteractionReplyOptions["flags"] | undefined;
+};
 export type RouteOptionsWithMethod<
 	AllowModalMethod extends boolean = false,
 	AllowEmptyMethod extends boolean = false,
@@ -170,6 +175,16 @@ export type RouteOptionsWithMethod<
 		| (AllowModalMethod extends true ? Method : Exclude<Method, "MODAL">)
 		| (AllowEmptyMethod extends true ? "" : never);
 	queryParams?: ConstructorParameters<typeof URLSearchParams>[0] | undefined;
+};
+// dispatch()'s options: flags only style the reply a dispatch creates, and a
+// MODAL dispatch never creates one (modals accept no flags; carry them on
+// the modal via RouteModalBuilder's setTo flags option instead)
+export type DispatchOptions<Locals> = (
+	| (RouteOptions & ReplyFlagsOption)
+	| (RouteOptions<true> & { method: "MODAL"; flags?: undefined })
+) & {
+	locals?: Locals | undefined;
+	values?: string[] | undefined;
 };
 
 // Param Extraction

@@ -1,11 +1,13 @@
 export const ID_PREFIX = "der";
 
-// query param that carries a component's `key` option inside its customId;
-// reserved: user queryParams can't use it, and it's stripped before routing.
-// A PUA character (serialized raw, see Location's query getter) so it costs
-// one customId char and can't clash with a plausible user param name; only
-// pathnames are PUA-decoded, so it never reaches the encoder
+// query params that carry a component's `key` and `flags` options inside its
+// customId; reserved: user queryParams can't use them, and they're stripped
+// before routing. PUA characters (serialized raw, see Location's query
+// getter) so each costs one customId char and can't clash with a plausible
+// user param name; only pathnames are PUA-decoded, so they never reach the
+// encoder. TODO(#1): fold both into a versioned encoder envelope instead
 export const KEY_QUERY_PARAM = "\ue000";
+export const FLAGS_QUERY_PARAM = "\ue001";
 
 export const PUA_START = 0xe000;
 export const PUA_END = 0xf8ff;

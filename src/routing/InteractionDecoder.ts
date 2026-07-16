@@ -3,8 +3,10 @@ import { compile } from "path-to-regexp";
 
 import type { Encoder } from "@encoding/Encoder";
 import { Location } from "@helpers/Location";
+import { decodePuaNumber } from "@helpers/puaCodepoints";
+import { REPLY_FLAGS } from "@routing/consts";
 import type { Method } from "@routing/types";
-import { KEY_QUERY_PARAM } from "@src/consts";
+import { FLAGS_QUERY_PARAM, KEY_QUERY_PARAM } from "@src/consts";
 
 /**
  * Turns a discord.js component or modal submit interaction that came from one
@@ -28,7 +30,9 @@ export class InteractionDecoder {
 	public decode(
 		interaction: Interaction,
 		idPrefix: string,
-	): { method: Method; path: string; values?: string[] } | false {
+	):
+		| { method: Method; path: string; values?: string[]; flags?: number }
+		| false {
 		if (!interaction.isMessageComponent() && !interaction.isModalSubmit())
 			return false;
 
@@ -41,11 +45,21 @@ export class InteractionDecoder {
 		if (decodedPath === false) return false;
 
 		if (interaction.isButton() || interaction.isModalSubmit()) {
+			// carried reply flags only ever apply to a modal submission: every
+			// other component lives on a message, so its dispatch never creates
+			// the reply the flags would style. Never paired with a MODAL method
+			// (only reachable by a forged customId; RouteModalBuilder rejects
+			// MODAL) — dispatch()'s options type relies on that invariant
+			const flags =
+				interaction.isModalSubmit() && decodedPath.method !== "MODAL"
+					? this.#extractFlags(decodedPath.path)
+					: undefined;
 			return {
 				method: decodedPath.method,
 				path: this.#fillParams(decodedPath.path, {
 					ts: interaction.createdTimestamp.toString(),
 				}).toString(),
+				...(flags !== undefined && { flags }),
 			};
 		} else if (interaction.isAnySelectMenu()) {
 			if (interaction.values.length === 0) {
@@ -125,15 +139,28 @@ export class InteractionDecoder {
 		return false;
 	}
 
+	// reads the reserved flags param and re-masks it to the reply-settable
+	// bits, so a forged or garbled customId can't smuggle arbitrary flags
+	#extractFlags(path: string): number | undefined {
+		const encoded = new Location(path).queryParams.get(FLAGS_QUERY_PARAM);
+		if (encoded === null) return undefined;
+		const decoded = decodePuaNumber(encoded);
+		if (decoded === undefined) return undefined;
+		const masked = decoded & REPLY_FLAGS;
+		return masked === 0 ? undefined : masked;
+	}
+
 	#fillParams(
 		path: string,
 		params: Partial<Record<string, string | string[]>> = {},
 		queryParams = params,
 	): Location {
 		const location = new Location(path);
-		// the key already did its job (making the customId unique within the
-		// message); drop it so handlers and select menu values never see it
+		// the reserved params already did their jobs (the key making the
+		// customId unique, the flags extracted before this call); drop them so
+		// handlers and select menu values never see them
 		location.queryParams.delete(KEY_QUERY_PARAM);
+		location.queryParams.delete(FLAGS_QUERY_PARAM);
 		const toPath = compile(location.pathname);
 
 		location.pathname = toPath(params);

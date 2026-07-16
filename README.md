@@ -98,6 +98,8 @@ Routers can be nested with `router.use(prefix, subRouter)`, mirroring how you'd 
 
 `RouteButtonBuilder`, `RouteStringSelectMenuBuilder`, `RouteChannelSelectMenuBuilder`, `RouteRoleSelectMenuBuilder`, `RouteUserSelectMenuBuilder`, and `RouteModalBuilder` extend their discord.js counterparts, replacing `setCustomId`/`setURL` with `.setTo(path, { method, query })`. The router encodes the path into a compact `customId` and decodes it back on click.
 
+`RouteModalBuilder`'s `setTo` also accepts reply `flags` (e.g. `MessageFlags.Ephemeral`), applied when the modal's submission creates the message it replies with — the case for a modal launched straight from a slash command. When the submission edits the message the modal was launched from, the flags are inert, since a message's creation-time flags can't change.
+
 ### Sessions
 
 Pass a `Session` type parameter to `EmbedRouter<Globals, Session, Locals>` and use `state.session.get()/set()/delete()` inside a handler to keep state tied to a message across multiple interactions (e.g. a multi-step form). Any handler that sets a session or a `cleanup` must also return a `timeout`, so the router always knows when to give up on stale state.

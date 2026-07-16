@@ -6,7 +6,7 @@ import type {
 
 import type { Globals, Locals, Session } from "@routes/types";
 
-export const commandNamesList = ["help", "catalog"] as const;
+export const commandNamesList = ["help", "catalog", "suggest"] as const;
 export type CommandName = (typeof commandNamesList)[number];
 
 const commandNames = new Set<CommandName>(commandNamesList);

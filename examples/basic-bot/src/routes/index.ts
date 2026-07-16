@@ -4,6 +4,7 @@ import { catalog } from "@routes/catalog";
 import { counter } from "@routes/counter";
 import { help } from "@routes/help";
 import { profile } from "@routes/profile";
+import { suggest } from "@routes/suggest";
 import { ticTacToe } from "@routes/tic-tac-toe";
 import type { Globals, Locals, Session } from "@routes/types";
 import { userInfo } from "@routes/user-info";
@@ -14,6 +15,7 @@ export const registerRoutes = (
 	router: EmbedRouter<Globals, Session, Locals>,
 ) => {
 	router.get("/help", help);
+	router.route("/suggest", suggest);
 
 	const catalogRouter = new EmbedRouter<Globals, Session, Locals>();
 
