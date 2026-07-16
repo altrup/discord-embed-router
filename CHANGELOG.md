@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-16
+
 ### Added
 
 - A `flags` option on `RouteModalBuilder`'s `setTo`/`toOptions` (and on `encodePath`): reply flags (e.g. `Ephemeral`) applied when the modal's submission creates the message it replies with, i.e. when the modal was launched from a slash command. Inert when the submission edits the message the modal was launched from, since creation-time flags can't change. The flags ride in a reserved query param (named by the PUA character `U+E001`, costing 3 chars plus one PUA char per power of 6400 in the masked bitfield — Ephemeral alone is 1) and are stripped before route matching; the value is masked to the reply-settable flags on both encode and decode, so a forged customId can't smuggle other bits. As with `key`, only versions with this change strip the param: a rolled-back bot passes it through to handlers.
@@ -42,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/altrup/discord-embed-router/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/altrup/discord-embed-router/releases/tag/v1.0.0
