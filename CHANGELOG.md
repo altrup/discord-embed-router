@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-20
+
+### Fixed
+
+- The generated type declarations default-imported `EventEmitter` from `node:events`, which is invalid for consumers compiling with `esModuleInterop: false` on TypeScript 5.x — with `skipLibCheck` on, `EmbedRouter` silently lost all inherited `EventEmitter` members (e.g. `Property 'on' does not exist`). The declarations use the named import, valid under any interop setting.
+
 ## [1.4.0] - 2026-07-20
 
 ### Added
@@ -52,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/altrup/discord-embed-router/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/altrup/discord-embed-router/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...v1.2.0
