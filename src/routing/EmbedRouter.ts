@@ -19,7 +19,7 @@ import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
 import { encodePuaNumber } from "@helpers/puaCodepoints";
 import { toError } from "@helpers/toError";
-import { REPLY_FLAGS } from "@routing/consts";
+import { REPLY_FLAGS, ROUTE_INFO } from "@routing/consts";
 import { IdentifierRegistry } from "@routing/IdentifierRegistry";
 import { InteractionDecoder } from "@routing/InteractionDecoder";
 import { MessageQueue } from "@routing/MessageQueue";
@@ -35,6 +35,7 @@ import type {
 	ReplyFlagsOption,
 	RouteHandler,
 	RouteHandlers,
+	RouteInfo,
 	RouteOptionsWithMethod,
 	Unused,
 } from "@routing/types";
@@ -45,7 +46,16 @@ import { ConfigError, RouteNotFoundError } from "@src/ConfigError";
 import { FLAGS_QUERY_PARAM, ID_PREFIX, KEY_QUERY_PARAM } from "@src/consts";
 
 type EmbedRouterEvents = {
-	routeError: [err: Error, interaction?: Interaction | undefined];
+	// emitted immediately before each route handler runs (an attempt that
+	// throws still counts); a redirect chain emits once per hop
+	route: [interaction: Interaction, info: RouteInfo];
+	// info is set when the error came from a matched route's handler, and
+	// undefined for router-internal errors that never reached one
+	routeError: [
+		err: Error,
+		interaction?: Interaction | undefined,
+		info?: RouteInfo | undefined,
+	];
 };
 
 export class EmbedRouter<
@@ -374,6 +384,15 @@ export class EmbedRouter<
 	public async dispatch<P extends Path = Path>(
 		interaction: Interaction,
 		path: P,
+		options: DispatchOptions<Locals> = {},
+	) {
+		return this.#dispatch("dispatch", interaction, path, options);
+	}
+
+	async #dispatch<P extends Path = Path>(
+		trigger: Exclude<RouteInfo["trigger"], "redirect">,
+		interaction: Interaction,
+		path: P,
 		{
 			method = "GET",
 			queryParams,
@@ -414,6 +433,7 @@ export class EmbedRouter<
 				method,
 				locals,
 				values,
+				trigger,
 			});
 			if (resolved === false)
 				throw new RouteNotFoundError(`No route found for ${pathWithQuery}`, {
@@ -541,12 +561,17 @@ export class EmbedRouter<
 				route: { method, path: pathToString(path, false) },
 			});
 		} catch (e: unknown) {
-			throw e instanceof ConfigError
-				? e
-				: new Error(
-						`Error while handling ${method} ${pathToString(path, false)}`,
-						{ cause: toError(e) },
-					);
+			if (e instanceof ConfigError) throw e;
+			const cause = toError(e);
+			// the RouteInfo a handler error was tagged with rides along on the
+			// wrapper, so routeError can report which route failed
+			throw Object.assign(
+				new Error(
+					`Error while handling ${method} ${pathToString(path, false)}`,
+					{ cause },
+				),
+				{ [ROUTE_INFO]: (cause as { [ROUTE_INFO]?: RouteInfo })[ROUTE_INFO] },
+			);
 		} finally {
 			this.#dispatchingInteractions.delete(interaction);
 			if (!message || !this.#cleanupManager.has(message.id)) {
@@ -592,7 +617,7 @@ export class EmbedRouter<
 						`Invalid component found: id ${interaction.customId}`,
 					);
 
-				await this.dispatch(interaction, route.path, {
+				await this.#dispatch("interaction", interaction, route.path, {
 					method: route.method,
 					locals: this.#localsProvider?.(this, interaction),
 					values: route.values,
@@ -609,7 +634,12 @@ export class EmbedRouter<
 			// instead of rethrown like other ConfigErrors
 			if (e instanceof ConfigError && !(e instanceof RouteNotFoundError))
 				throw e;
-			this.emit("routeError", toError(e), interaction);
+			this.emit(
+				"routeError",
+				toError(e),
+				interaction,
+				(e as { [ROUTE_INFO]?: RouteInfo } | null)?.[ROUTE_INFO],
+			);
 		}
 	}
 

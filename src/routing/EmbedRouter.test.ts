@@ -1278,3 +1278,205 @@ test("route() throws a ConfigError naming any unknown handler key, even alongsid
 		}),
 	).toThrow(/psot/);
 });
+
+test("route is emitted before the handler runs", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const order: string[] = [];
+
+	embedRouter.get("/test", () => {
+		order.push("handler");
+		return {};
+	});
+	embedRouter.on("route", () => order.push("event"));
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/test");
+
+	expect(order).toEqual(["event", "handler"]);
+});
+
+test("route carries the method, matched pattern, and 'interaction' trigger for a component interaction", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get("/thing/:id", () => ({}));
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	const interaction = mockButtonInteraction(
+		embedRouter.encodePath("/thing/5", { method: "GET" }),
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() => expect(onRoute).toHaveBeenCalledOnce());
+	expect(onRoute).toHaveBeenCalledWith(interaction, {
+		method: "GET",
+		path: "/thing/:id",
+		trigger: "interaction",
+	});
+});
+
+test("route carries the 'dispatch' trigger for dispatch() calls", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get("/thing/:id", () => ({}));
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/thing/5");
+
+	expect(onRoute).toHaveBeenCalledExactlyOnceWith(interaction, {
+		method: "GET",
+		path: "/thing/:id",
+		trigger: "dispatch",
+	});
+});
+
+test("a redirect hop after an interaction POST is emitted with the 'redirect' trigger", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.post("/inc", () => ({ redirect: "/page" }));
+	embedRouter.get("/page", () => ({}));
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	const interaction = mockButtonInteraction(
+		embedRouter.encodePath("/inc", { method: "POST" }),
+	);
+	client.emit("interactionCreate", interaction);
+
+	await vi.waitFor(() => expect(onRoute).toHaveBeenCalledTimes(2));
+	expect(onRoute.mock.calls).toEqual([
+		[interaction, { method: "POST", path: "/inc", trigger: "interaction" }],
+		[interaction, { method: "GET", path: "/page", trigger: "redirect" }],
+	]);
+});
+
+test("a redirect hop after a dispatch is 'redirect'; only the first hop is 'dispatch'", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.post("/inc", () => ({ redirect: "/page" }));
+	embedRouter.get("/page", () => ({}));
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/inc", { method: "POST" });
+
+	expect(onRoute.mock.calls).toEqual([
+		[interaction, { method: "POST", path: "/inc", trigger: "dispatch" }],
+		[interaction, { method: "GET", path: "/page", trigger: "redirect" }],
+	]);
+});
+
+test("route reports the specific pattern that matched in a multi-path registration", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get(["/filter", "/filter/:scope"], () => ({}));
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/filter/all");
+
+	expect(onRoute).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+		method: "GET",
+		path: "/filter/:scope",
+		trigger: "dispatch",
+	});
+});
+
+test("route()-registered handlers emit route identically to method-registered ones", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.route("/combo", {
+		get: () => ({}),
+		post: () => ({ redirect: "/combo" }),
+	});
+
+	const onRoute = vi.fn();
+	embedRouter.on("route", onRoute);
+
+	const interaction = mockButtonInteraction("");
+	await embedRouter.dispatch(interaction, "/combo", { method: "POST" });
+
+	expect(onRoute.mock.calls).toEqual([
+		[interaction, { method: "POST", path: "/combo", trigger: "dispatch" }],
+		[interaction, { method: "GET", path: "/combo", trigger: "redirect" }],
+	]);
+});
+
+test("a throwing route listener is reported via routeError and does not prevent the handler from running", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn().mockReturnValue({});
+	embedRouter.get("/test", handler);
+
+	const listenerError = new Error("listener boom");
+	embedRouter.on("route", () => {
+		throw listenerError;
+	});
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/test");
+
+	expect(handler).toHaveBeenCalledOnce();
+	expect(onError).toHaveBeenCalledExactlyOnceWith(
+		listenerError,
+		expect.anything(),
+		{ method: "GET", path: "/test", trigger: "dispatch" },
+	);
+});
+
+test("routeError carries the RouteInfo of the route whose handler threw", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.get("/broken/:id", () => {
+		throw new Error("boom");
+	});
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(
+			embedRouter.encodePath("/broken/5", { method: "GET" }),
+		),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+	const [, , info] = onError.mock.calls[0]!;
+	expect(info).toEqual({
+		method: "GET",
+		path: "/broken/:id",
+		trigger: "interaction",
+	});
+});
+
+test("routeError has no RouteInfo for a failure before any route matched", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get("/test", () => ({}));
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	// prefixed but undecodable customId never reaches a handler
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(`${embedRouter.idPrefix}garbage`),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+	const [error, , info] = onError.mock.calls[0]!;
+	expect(error.message).toContain("Invalid component");
+	expect(info).toBeUndefined();
+});

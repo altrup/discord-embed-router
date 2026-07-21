@@ -7,6 +7,8 @@ import type { Encoder } from "@encoding/Encoder";
 import { isSupportedInteraction } from "@helpers/isSupportedInteraction";
 import { Location } from "@helpers/Location";
 import { pathToString } from "@helpers/pathToString";
+import { toError } from "@helpers/toError";
+import { ROUTE_INFO } from "@routing/consts";
 import type { EmbedRouter } from "@routing/EmbedRouter";
 import type {
 	CompiledRoute,
@@ -15,6 +17,7 @@ import type {
 	ModalRender,
 	ModalResult,
 	RouteHandler,
+	RouteInfo,
 	RouteRender,
 	RouteResult,
 } from "@routing/types";
@@ -70,19 +73,16 @@ export class RouteRegistry<Globals, Session, Locals> {
 		handler: RouteHandler<M, Globals, Session, Locals, ExtractParams<P>>,
 	) {
 		const methodRoutes = this.#routes.get(method) ?? [];
-		methodRoutes.push({
-			method,
-			path: Array.isArray(routePath) ? routePath : [routePath],
-			matchFunction: match(routePath),
-			handler: handler as RouteHandler<M, Globals, Session, Locals>,
-		});
-		this.#routes.set(method, methodRoutes);
-
-		if (Array.isArray(routePath)) {
-			routePath.forEach((p) => this.#encoder.registerPath(p));
-		} else {
-			this.#encoder.registerPath(routePath);
+		for (const p of Array.isArray(routePath) ? routePath : [routePath]) {
+			methodRoutes.push({
+				method,
+				path: p,
+				matchFunction: match(p),
+				handler: handler as RouteHandler<M, Globals, Session, Locals>,
+			});
+			this.#encoder.registerPath(p);
 		}
+		this.#routes.set(method, methodRoutes);
 	}
 
 	/**
@@ -100,7 +100,7 @@ export class RouteRegistry<Globals, Session, Locals> {
 			for (const route of routes) {
 				this.addRoute(
 					method,
-					route.path.map((p) => path.posix.join(pathString, pathToString(p))),
+					path.posix.join(pathString, pathToString(route.path)),
 					route.handler as unknown as RouteHandler<
 						Method,
 						Globals,
@@ -135,11 +135,13 @@ export class RouteRegistry<Globals, Session, Locals> {
 			method = "GET",
 			locals,
 			values,
+			trigger,
 		}: {
 			interaction: Interaction;
 			method?: Method;
 			locals: Locals | undefined;
 			values?: string[] | undefined;
+			trigger: Exclude<RouteInfo["trigger"], "redirect">;
 		},
 	): Promise<
 		| { message: RouteRender<Globals, Session, Locals> | undefined }
@@ -206,15 +208,32 @@ export class RouteRegistry<Globals, Session, Locals> {
 					}
 				}
 
-				routeResult = await route.handler(this.#embedRouter, interaction, {
-					...state,
-					session:
-						currentMethod === "MODAL"
-							? this.#sessionManager.readOnly(
-									this.#sessionManager.open(interaction, messageId),
-								)
-							: this.#sessionManager.open(interaction, messageId),
-				});
+				const info: RouteInfo = {
+					method: currentMethod,
+					path: pathToString(route.path, false),
+					trigger: hop === 0 ? trigger : "redirect",
+				};
+				// a throwing route listener must never break handler execution,
+				// so it's reported through routeError instead of propagating
+				try {
+					this.#embedRouter.emit("route", interaction, info);
+				} catch (e) {
+					this.#embedRouter.emit("routeError", toError(e), interaction, info);
+				}
+
+				try {
+					routeResult = await route.handler(this.#embedRouter, interaction, {
+						...state,
+						session:
+							currentMethod === "MODAL"
+								? this.#sessionManager.readOnly(
+										this.#sessionManager.open(interaction, messageId),
+									)
+								: this.#sessionManager.open(interaction, messageId),
+					});
+				} catch (e) {
+					throw Object.assign(toError(e), { [ROUTE_INFO]: info });
+				}
 				break;
 			}
 			if (!matched) return false;
