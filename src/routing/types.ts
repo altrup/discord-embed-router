@@ -123,6 +123,18 @@ export type LocalsProvider<Globals, Session, Locals> = (
 	interaction: Interaction,
 ) => Locals;
 
+// describes the route handler about to run: emitted as the `route` event and
+// appended to `routeError` when that handler throws. `path` is the registered
+// pattern that matched (e.g. "/filter/:scope"), never the resolved path.
+// `trigger` is why the handler ran: a matched component/modal interaction, a
+// dispatch() call, or a redirect from a previous handler on the same
+// interaction (a redirect chain is "redirect" from the second hop onward).
+export type RouteInfo = {
+	method: Method;
+	path: string;
+	trigger: "interaction" | "dispatch" | "redirect";
+};
+
 export const methodsList = [
 	"GET",
 	"POST",
@@ -140,7 +152,9 @@ export type CompiledRoute<
 	P extends ParamData = ParamData,
 > = {
 	method: Method;
-	path: Path[];
+	// one compiled entry per registered pattern (a multi-path registration
+	// becomes several), so a match always knows the specific pattern it hit
+	path: Path;
 	matchFunction: MatchFunction<P>;
 	handler: RouteHandler<M, Globals, Session, Locals, P>;
 };

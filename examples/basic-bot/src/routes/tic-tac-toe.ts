@@ -41,24 +41,21 @@ function cellButton(
 		});
 }
 
-// the same nav row appears above and below the board; `key` keeps the
-// otherwise identical customIds unique, which Discord requires per message
 function navRow(
 	embedRouter: EmbedRouter<Globals, Session, Locals>,
 	path: Path,
 	board: TicTacToeBoard,
-	key: string,
 ) {
 	return new ActionRowBuilder()
 		.addComponents(
 			new RouteButtonBuilder(embedRouter)
 				.setLabel("Back")
 				.setStyle(ButtonStyle.Secondary)
-				.setTo("/catalog", { key }),
+				.setTo("/catalog"),
 			new RouteButtonBuilder(embedRouter)
 				.setLabel(board.isOver ? "Play Again" : "Restart")
 				.setStyle(board.isOver ? ButtonStyle.Success : ButtonStyle.Danger)
-				.setTo(path, { method: "PUT", key }),
+				.setTo(path, { method: "PUT" }),
 		)
 		.toJSON();
 }
@@ -83,7 +80,6 @@ export const ticTacToe = {
 					.setDescription(statusText(board)),
 			],
 			components: [
-				navRow(embedRouter, path, board, "top"),
 				new ActionRowBuilder()
 					.addComponents(
 						cellButton(embedRouter, path, board, 0),
@@ -105,7 +101,7 @@ export const ticTacToe = {
 						cellButton(embedRouter, path, board, 8),
 					)
 					.toJSON(),
-				navRow(embedRouter, path, board, "bottom"),
+				navRow(embedRouter, path, board),
 			],
 			cleanup: (newState) => {
 				if (computerMoveTimer) clearTimeout(computerMoveTimer);

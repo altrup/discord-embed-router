@@ -23,6 +23,7 @@ export type {
 	ModalResult,
 	RouteHandler,
 	RouteHandlers,
+	RouteInfo,
 	Method,
 	RouteOptions,
 	RouteOptionsWithMethod,
