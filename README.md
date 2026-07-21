@@ -108,6 +108,21 @@ Pass a `Session` type parameter to `EmbedRouter<Globals, Session, Locals>` and u
 
 A `GET` handler can return `{ cleanup, timeout }` alongside its content. If no further interaction lands on that message before `timeout` ms, `cleanup` runs and its return value (if any) is applied to the message, which is handy for expiring a form or disabling stale buttons.
 
+### Observability
+
+The router is an `EventEmitter` with two events:
+
+- `route: [interaction, info]` — emitted immediately before each route handler runs, so an attempt that throws still counts. `info: RouteInfo` carries the `method`, the registered `path` pattern that matched (e.g. `/filter/:scope` — the pattern, never the resolved path), and the `trigger`: `"interaction"` when a component/modal interaction arrived and matched, `"dispatch"` when your code called `router.dispatch()`, `"redirect"` when a previous handler on the same interaction returned a redirect. A redirect chain emits once per hop and is `"redirect"` from the second hop onward, whatever started it. A throwing `route` listener never breaks handler execution; its error is reported via `routeError` instead.
+- `routeError: [err, interaction?, info?]` — reported errors (also reachable via the `router.onError(listener)` helper). `info` is the same `RouteInfo` when the error came from a matched route's handler, and `undefined` for router-internal errors that never reached one.
+
+```ts
+router.on("route", (interaction, info) => {
+	metrics.increment(`routes.${info.method}.${info.path}`, {
+		trigger: info.trigger,
+	});
+});
+```
+
 ### Encoding
 
 By default, paths are compacted with `HashEncoder` so `customId`s stay under Discord's 100-character limit even for deeply nested routes. Pass a custom `Encoder` via the `EmbedRouter` constructor if you need different encoding behavior.
