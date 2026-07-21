@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-20
+
 ### Added
 
 - A `route` event on `EmbedRouter`, emitted immediately before each route handler runs (so an attempt that throws still counts): `route: [interaction, info]`, where `info: RouteInfo` carries the `method`, the registered `path` pattern that matched (e.g. `/filter/:scope`, never the resolved path), and the `trigger` — `"interaction"` for a matched component/modal interaction, `"dispatch"` for a `dispatch()` call, `"redirect"` for a hop a previous handler's redirect started (a redirect chain is `"redirect"` from the second hop onward). A throwing `route` listener never breaks handler execution; its error is reported via `routeError` instead.
@@ -50,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/altrup/discord-embed-router/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/altrup/discord-embed-router/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/altrup/discord-embed-router/compare/v1.0.0...v1.1.0
