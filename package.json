@@ -1,6 +1,6 @@
 {
 	"name": "discord-embed-router",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"description": "An Express-inspired router for discord.js embeds and interactions",
 	"files": [
 		"dist"
