@@ -30,6 +30,11 @@ const router = new EmbedRouter<Globals, Session, Locals>(client);
 // listen to discord-embed-router errors and warnings
 router.onError(console.error);
 process.on("warning", console.error);
+// log every route attempt: method, matched pattern (never the resolved
+// path), and what triggered it (interaction | dispatch | redirect)
+router.on("route", (_interaction, info) => {
+	console.log(`[route] ${info.method} ${info.path} (${info.trigger})`);
+});
 
 // inject persistent-data access into every route via state.locals; the
 // provider must be synchronous, so it hands routes the store itself and
