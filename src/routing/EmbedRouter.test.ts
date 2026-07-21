@@ -1480,3 +1480,22 @@ test("routeError has no RouteInfo for a failure before any route matched", async
 	expect(error.message).toContain("Invalid component");
 	expect(info).toBeUndefined();
 });
+
+test("the handler still runs when both a route listener and a routeError listener throw", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn().mockReturnValue({});
+	embedRouter.get("/test", handler);
+
+	embedRouter.on("route", () => {
+		throw new Error("route listener boom");
+	});
+	embedRouter.onError(() => {
+		throw new Error("routeError listener boom");
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/test");
+
+	expect(handler).toHaveBeenCalledOnce();
+});

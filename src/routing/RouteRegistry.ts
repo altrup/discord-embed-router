@@ -218,7 +218,12 @@ export class RouteRegistry<Globals, Session, Locals> {
 				try {
 					this.#embedRouter.emit("route", interaction, info);
 				} catch (e) {
-					this.#embedRouter.emit("routeError", toError(e), interaction, info);
+					try {
+						this.#embedRouter.emit("routeError", toError(e), interaction, info);
+					} catch {
+						// a routeError listener that itself throws must not skip the
+						// handler either
+					}
 				}
 
 				try {
