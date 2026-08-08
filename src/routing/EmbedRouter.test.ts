@@ -1461,6 +1461,92 @@ test("routeError carries the RouteInfo of the route whose handler threw", async 
 	});
 });
 
+test("routeError carries the dispatched route when acknowledging the interaction fails", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.get("/panel/:id", () => ({ content: "hi" }));
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	const overrides = {
+		update: vi.fn().mockRejectedValue(new Error("Unknown interaction")),
+	} as unknown as Partial<ButtonInteraction>;
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(
+			embedRouter.encodePath("/panel/5", { method: "GET" }),
+			overrides,
+		),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+	const [, , info] = onError.mock.calls[0]!;
+	expect(info).toEqual({
+		method: "GET",
+		path: "/panel/:id",
+		trigger: "interaction",
+	});
+});
+
+test("routeError names the originating route when a redirected render fails to acknowledge", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.post("/ring/:scope", () => ({ redirect: "/panel" }));
+	embedRouter.get("/panel", () => ({ content: "hi" }));
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	const overrides = {
+		update: vi.fn().mockRejectedValue(new Error("Unknown interaction")),
+	} as unknown as Partial<ButtonInteraction>;
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(
+			embedRouter.encodePath("/ring/7", { method: "POST" }),
+			overrides,
+		),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+	const [, , info] = onError.mock.calls[0]!;
+	expect(info).toEqual({
+		method: "POST",
+		path: "/ring/:scope",
+		trigger: "interaction",
+	});
+});
+
+test("routeError names the route that registered a cleanup when the cleanup throws", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	embedRouter.get("/a/:id", () => ({
+		cleanup: () => {
+			throw new Error("cleanup boom");
+		},
+		timeout: 1000,
+	}));
+	embedRouter.get("/b", () => ({ content: "hi" }));
+
+	const onError = vi.fn();
+	embedRouter.onError(onError);
+
+	// /a's cleanup is preempted when /b renders over the same message
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a/5");
+	client.emit(
+		"interactionCreate",
+		mockButtonInteraction(embedRouter.encodePath("/b", { method: "GET" })),
+	);
+
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+	const [, , info] = onError.mock.calls[0]!;
+	expect(info).toEqual({ method: "GET", path: "/a/:id", trigger: "dispatch" });
+});
+
 test("routeError has no RouteInfo for a failure before any route matched", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);

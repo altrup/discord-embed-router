@@ -93,8 +93,8 @@ export class EmbedRouter<
 	// Session storage and cleanup/timeout lifecycle for messages
 	#sessionManager: SessionManager<Session> = new SessionManager();
 	#cleanupManager: CleanupManager<Globals, Session, Locals> =
-		new CleanupManager(this.#sessionManager, (err, interaction) =>
-			this.emit("routeError", err, interaction),
+		new CleanupManager(this.#sessionManager, (err, interaction, info) =>
+			this.emit("routeError", err, interaction, info),
 		);
 	// serializes dispatch per message, so concurrent interactions on the same
 	// message can't interleave their session reads/writes
@@ -402,6 +402,9 @@ export class EmbedRouter<
 		}: DispatchOptions<Locals> = {},
 	) {
 		let message: Message | undefined;
+		// kept outside the try so a failure after the handler returned -- an
+		// acknowledgement Discord rejects, say -- still reports its route
+		let routeInfo: RouteInfo | undefined;
 		if (this.#dispatchingInteractions.has(interaction))
 			throw new ConfigError(
 				"Cannot dispatch() an interaction that's still being dispatched; return a redirect instead of calling dispatch() on your own interaction",
@@ -440,6 +443,7 @@ export class EmbedRouter<
 					method,
 					path,
 				});
+			routeInfo = resolved.info;
 
 			if ("modal" in resolved) {
 				if (resolved.modal) {
@@ -558,7 +562,7 @@ export class EmbedRouter<
 				cleanupFn: routeResponse.cleanup?.bind(routeResponse),
 				applyFn,
 				timeout: routeResponse.timeout,
-				route: { method, path: pathToString(path, false) },
+				route: resolved.destination,
 			});
 		} catch (e: unknown) {
 			if (e instanceof ConfigError) throw e;
@@ -570,7 +574,10 @@ export class EmbedRouter<
 					`Error while handling ${method} ${pathToString(path, false)}`,
 					{ cause },
 				),
-				{ [ROUTE_INFO]: (cause as { [ROUTE_INFO]?: RouteInfo })[ROUTE_INFO] },
+				{
+					[ROUTE_INFO]:
+						(cause as { [ROUTE_INFO]?: RouteInfo })[ROUTE_INFO] ?? routeInfo,
+				},
 			);
 		} finally {
 			this.#dispatchingInteractions.delete(interaction);

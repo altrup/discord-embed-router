@@ -2,6 +2,7 @@ import { EmbedRouter } from "discord-embed-router";
 
 import { catalog } from "@routes/catalog";
 import { counter } from "@routes/counter";
+import { error } from "@routes/error";
 import { help } from "@routes/help";
 import { profile } from "@routes/profile";
 import { suggest } from "@routes/suggest";
@@ -26,6 +27,7 @@ export const registerRoutes = (
 	catalogRouter.get("/timer", timer);
 	catalogRouter.get("/profile", profile);
 	catalogRouter.route("/tic-tac-toe", ticTacToe);
+	catalogRouter.get("/error", error);
 
 	router.use("/catalog", catalogRouter);
 };

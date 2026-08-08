@@ -47,6 +47,10 @@ export const catalog: RouteHandler<"GET", Globals, Session, Locals> = (
 								.setLabel("Tic-Tac-Toe")
 								.setDescription("Play tic-tac-toe against the computer")
 								.setTo(join(path, "tic-tac-toe")),
+							new RouteStringSelectMenuOptionBuilder(embedRouter)
+								.setLabel("Error")
+								.setDescription("Throws an error")
+								.setTo(join(path, "error")),
 						),
 				)
 				.toJSON(),

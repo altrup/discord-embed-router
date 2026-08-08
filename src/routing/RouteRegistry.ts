@@ -126,7 +126,9 @@ export class RouteRegistry<Globals, Session, Locals> {
 	 * @param interaction interaction to connect to
 	 * @param method method to send to route
 	 * @param locals additional info to pass in to page through state.local (optional)
-	 * @returns discord message associated with route OR false
+	 * @returns the render or modal for the route, paired with the RouteInfo of
+	 * the route that triggered it and of the route that produced it (they
+	 * differ once a redirect is involved), OR false when nothing matched
 	 */
 	public async resolve<P extends Path = Path>(
 		path: P,
@@ -144,14 +146,25 @@ export class RouteRegistry<Globals, Session, Locals> {
 			trigger: Exclude<RouteInfo["trigger"], "redirect">;
 		},
 	): Promise<
-		| { message: RouteRender<Globals, Session, Locals> | undefined }
-		| { modal: ModalRender<Globals, Session, Locals> | undefined }
+		| {
+				message: RouteRender<Globals, Session, Locals> | undefined;
+				info: RouteInfo;
+				destination: RouteInfo;
+		  }
+		| {
+				modal: ModalRender<Globals, Session, Locals> | undefined;
+				info: RouteInfo;
+				destination: RouteInfo;
+		  }
 		| false
 	> {
 		if (!isSupportedInteraction(interaction)) return false;
 
 		let currentPath: Path = path;
 		let currentMethod = method;
+		// the route the user actually triggered, kept across redirect hops so a
+		// failure while rendering the destination still names what caused it
+		let originInfo: RouteInfo | undefined;
 
 		for (let hop = 0; ; hop++) {
 			if (hop >= MAX_REDIRECTS)
@@ -165,11 +178,10 @@ export class RouteRegistry<Globals, Session, Locals> {
 				| RouteResult<Globals, Session, Locals>
 				| ModalResult<Globals, Session, Locals>
 				| undefined;
-			let matched = false;
+			let matchedInfo: RouteInfo | undefined;
 			for (const route of this.#routes.get(currentMethod) ?? []) {
 				const result = route.matchFunction(location.pathname);
 				if (!result) continue;
-				matched = true;
 
 				const messageId =
 					"message" in interaction ? interaction.message?.id : undefined;
@@ -213,6 +225,7 @@ export class RouteRegistry<Globals, Session, Locals> {
 					path: pathToString(route.path, false),
 					trigger: hop === 0 ? trigger : "redirect",
 				};
+				matchedInfo = info;
 				// a throwing route listener must never break handler execution,
 				// so it's reported through routeError instead of propagating
 				try {
@@ -241,7 +254,8 @@ export class RouteRegistry<Globals, Session, Locals> {
 				}
 				break;
 			}
-			if (!matched) return false;
+			if (!matchedInfo) return false;
+			originInfo ??= matchedInfo;
 
 			if (routeResult && "redirect" in routeResult) {
 				if ("cleanup" in routeResult || "timeout" in routeResult)
@@ -288,6 +302,8 @@ export class RouteRegistry<Globals, Session, Locals> {
 				return {
 					modal: routeResult as
 						ModalRender<Globals, Session, Locals> | undefined,
+					info: originInfo,
+					destination: matchedInfo,
 				};
 			}
 
@@ -303,6 +319,8 @@ export class RouteRegistry<Globals, Session, Locals> {
 			return {
 				message: routeResult as
 					RouteRender<Globals, Session, Locals> | undefined,
+				info: originInfo,
+				destination: matchedInfo,
 			};
 		}
 	}

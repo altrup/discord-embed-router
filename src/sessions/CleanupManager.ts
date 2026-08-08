@@ -1,7 +1,7 @@
 import type { Interaction, Snowflake } from "discord.js";
 
 import { toError } from "@helpers/toError";
-import type { Method, State } from "@routing/types";
+import type { RouteInfo, State } from "@routing/types";
 import type { SessionManager } from "@sessions/SessionManager";
 import type { ApplyHandler, CleanupHandler } from "@sessions/types";
 import { ConfigError } from "@src/ConfigError";
@@ -24,16 +24,16 @@ export class CleanupManager<Globals, Session, Locals> {
 			applyFn: ApplyHandler | undefined;
 			// the route that registered this cleanup, so a late-firing error can
 			// still name its route even though nothing on the stack does anymore
-			route: { method: Method; path: string };
+			route: RouteInfo;
 		}
 	>();
 
 	#sessions: SessionManager<Session>;
-	#onError: (err: Error, interaction: Interaction) => void;
+	#onError: (err: Error, interaction: Interaction, info: RouteInfo) => void;
 
 	constructor(
 		sessions: SessionManager<Session>,
-		onError: (err: Error, interaction: Interaction) => void,
+		onError: (err: Error, interaction: Interaction, info: RouteInfo) => void,
 	) {
 		this.#sessions = sessions;
 		this.#onError = onError;
@@ -88,7 +88,7 @@ export class CleanupManager<Globals, Session, Locals> {
 			cleanupFn: CleanupHandler<Globals, Session, Locals> | undefined;
 			applyFn: ApplyHandler | undefined;
 			timeout: number;
-			route: { method: Method; path: string };
+			route: RouteInfo;
 		},
 	) {
 		this.remove(messageId);
@@ -162,16 +162,13 @@ export class CleanupManager<Globals, Session, Locals> {
 	// wraps with the route that registered the cleanup, since by the time a
 	// timeout or an applyFn rejection surfaces, nothing on the stack knows
 	// which route that was anymore
-	#report(
-		e: unknown,
-		interaction: Interaction,
-		route: { method: Method; path: string },
-	) {
+	#report(e: unknown, interaction: Interaction, route: RouteInfo) {
 		this.#onError(
 			new Error(`Error while handling ${route.method} ${route.path}`, {
 				cause: toError(e),
 			}),
 			interaction,
+			route,
 		);
 	}
 }

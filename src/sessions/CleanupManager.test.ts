@@ -37,7 +37,7 @@ test("has() reflects whether a message has a registered cleanup", () => {
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	expect(manager.has("msg1")).toBe(true);
 });
@@ -57,7 +57,7 @@ test("interactionFor() returns the registered interaction without running or can
 		cleanupFn,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	expect(manager.interactionFor("msg1")).toBe(interaction);
@@ -76,7 +76,7 @@ test("run() invokes cleanupFn with the new state", async () => {
 		cleanupFn,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	const newState = mockState();
@@ -97,7 +97,7 @@ test("run() with no new state means a real timeout", async () => {
 		cleanupFn,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	await manager.run("msg1", undefined);
@@ -116,7 +116,7 @@ test("registering a new cleanup cancels the previous one's timer without re-runn
 		cleanupFn: oldCleanupFn,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	const newCleanupFn = vi.fn();
@@ -125,7 +125,7 @@ test("registering a new cleanup cancels the previous one's timer without re-runn
 		cleanupFn: newCleanupFn,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	// registration doesn't run either handler itself -- the caller is
@@ -153,7 +153,7 @@ test("a real timeout deletes the message's session; a new state does not", async
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	await manager.run("msg1", mockState());
 	expect(sessions.open(mockInteraction("check1"), "msg1").has()).toBe(true);
@@ -165,7 +165,7 @@ test("a real timeout deletes the message's session; a new state does not", async
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	await manager.run("msg1", undefined);
 	expect(sessions.open(mockInteraction("check2"), "msg1").has()).toBe(false);
@@ -190,7 +190,7 @@ test("a cleanupFn's session write through its own closed-over handle is persiste
 		},
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	// a new interaction taking over -- not a real timeout
@@ -219,7 +219,7 @@ test("a real timeout drops whatever cleanupFn wrote through its own closed-over 
 		},
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	await manager.run("msg1", undefined);
@@ -242,7 +242,7 @@ test("a cleanupFn's session write doesn't throw, since register() leaves its han
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	// register() must not have already committed (and thus closed) the
@@ -265,7 +265,7 @@ test("a cleanupFn's handle is closed after it runs, so a later write throws inst
 		cleanupFn: undefined,
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	await manager.run("msg1", undefined);
 
@@ -284,7 +284,7 @@ test("applyFn only runs on a real timeout, and only if cleanupFn returned a resu
 		cleanupFn: () => ({ content: "done" }),
 		applyFn,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	await manager.run("msg1", mockState());
 	expect(applyFn).not.toHaveBeenCalled();
@@ -294,7 +294,7 @@ test("applyFn only runs on a real timeout, and only if cleanupFn returned a resu
 		cleanupFn: () => ({ content: "done" }),
 		applyFn,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 	await manager.run("msg2", undefined);
 	expect(applyFn).toHaveBeenCalledWith({ content: "done" });
@@ -313,7 +313,7 @@ test("ConfigError from cleanupFn propagates instead of going through onError", a
 		},
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	await expect(manager.run("msg1", mockState())).rejects.toThrow(ConfigError);
@@ -336,7 +336,7 @@ test("a ConfigError thrown when a real timeout fires is reported via onError ins
 			},
 			applyFn: undefined,
 			timeout: 1000,
-			route: { method: "GET", path: "/x" },
+			route: { method: "GET", path: "/x", trigger: "interaction" },
 		});
 
 		// unlike run() called directly (above), nothing awaits register()'s own
@@ -350,6 +350,7 @@ test("a ConfigError thrown when a real timeout fires is reported via onError ins
 				cause: expect.any(ConfigError),
 			}),
 			interaction,
+			{ method: "GET", path: "/x", trigger: "interaction" },
 		);
 	} finally {
 		vi.useRealTimers();
@@ -370,7 +371,7 @@ test("a regular error from cleanupFn is reported via onError instead of rejectin
 		},
 		applyFn: undefined,
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	await expect(manager.run("msg1", mockState())).resolves.toBeUndefined();
@@ -380,6 +381,7 @@ test("a regular error from cleanupFn is reported via onError instead of rejectin
 			cause: expect.any(Error),
 		}),
 		interaction,
+		{ method: "GET", path: "/x", trigger: "interaction" },
 	);
 });
 
@@ -395,12 +397,13 @@ test("an applyFn rejection is reported via onError", async () => {
 		cleanupFn: () => ({ content: "done" }),
 		applyFn: vi.fn().mockRejectedValue(new Error("apply failed")),
 		timeout: 10_000,
-		route: { method: "GET", path: "/x" },
+		route: { method: "GET", path: "/x", trigger: "interaction" },
 	});
 
 	await manager.run("msg1", undefined);
 	expect(onError).toHaveBeenCalledWith(
 		expect.objectContaining({ message: "Error while handling GET /x" }),
 		interaction,
+		{ method: "GET", path: "/x", trigger: "interaction" },
 	);
 });
