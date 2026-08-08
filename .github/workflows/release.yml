@@ -27,10 +27,12 @@ jobs:
             exit 1
           fi
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
           registry-url: https://registry.npmjs.org
 
       - name: Verify tag matches package.json version
@@ -41,12 +43,13 @@ jobs:
             exit 1
           fi
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: npx publint
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm dlx publint
 
-      - run: npm publish --provenance --access public
+      # --no-git-checks: the tag build runs on a detached HEAD
+      - run: pnpm publish --provenance --access public --no-git-checks

@@ -30,8 +30,8 @@ Route wiring lives in [`src/routes/index.ts`](src/routes/index.ts), including a 
 - Install dependencies and build the library (the example consumes the local package through its built output), from the repo root:
 
   ```bash
-  npm install
-  npm run build
+  pnpm install
+  pnpm build
   ```
 
 - Enter this folder
@@ -49,13 +49,13 @@ Route wiring lives in [`src/routes/index.ts`](src/routes/index.ts), including a 
 - Deploy commands
 
   ```bash
-  npm run deploy-commands
+  pnpm deploy-commands
   ```
 
 - Start the bot with hot reloading
 
   ```bash
-  npm run dev
+  pnpm dev
   ```
 
 - Invite the bot to your server ([guide](https://discordjs.guide/legacy/preparations/adding-your-app)), then run `/help` or `/catalog`

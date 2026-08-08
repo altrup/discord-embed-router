@@ -37,7 +37,7 @@
 		"test:watch": "vitest",
 		"format": "prettier . --write",
 		"format:check": "prettier . --check",
-		"prepublishOnly": "npm run build"
+		"prepublishOnly": "pnpm run build"
 	},
 	"homepage": "https://github.com/altrup/discord-embed-router#readme",
 	"bugs": {
@@ -53,10 +53,7 @@
 		"node": ">=18"
 	},
 	"type": "commonjs",
-	"workspaces": [
-		".",
-		"examples/basic-bot"
-	],
+	"packageManager": "pnpm@11.3.0",
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",

@@ -12,21 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
 
       # Catches broken exports/types in the publishable artifact
-      - run: npx publint
+      - run: pnpm dlx publint
 
   example:
     name: Example bot
@@ -34,18 +36,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      # The example consumes the package through its exports map
-      # (file:../..), so it only typechecks against a built dist
-      - run: npm run build
+      # The example consumes the package through its exports map,
+      # so it only typechecks against a built dist
+      - run: pnpm build
 
-      - run: npm run lint --workspace=basic-bot
-      - run: npm run format:check --workspace=basic-bot
-      - run: npm run typecheck --workspace=basic-bot
-      - run: npm run build --workspace=basic-bot
+      - run: pnpm --filter basic-bot lint
+      - run: pnpm --filter basic-bot format:check
+      - run: pnpm --filter basic-bot typecheck
+      - run: pnpm --filter basic-bot build
