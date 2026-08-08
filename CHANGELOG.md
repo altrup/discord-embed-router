@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-08
+
+### Fixed
+
+- `routeError` reported `info` as `undefined` for three failures that did come from a matched route, contradicting the documented contract: the interaction acknowledgement rejecting (e.g. `Unknown interaction`), the same rejection while rendering a redirect's destination, and a `cleanup` handler throwing. Each now carries the `RouteInfo` of the route the user actually triggered — for a redirect chain that is the originating route, not the destination, and for a cleanup it is the route that registered it, with that route's original `trigger`.
+
 ## [1.4.1] - 2026-07-20
 
 ### Fixed
@@ -58,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleanup handlers that rewrite a message once its interaction window expires.
 - `HashEncoder` for compact `customId` encoding, with a pluggable `Encoder` interface.
 
-[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/altrup/discord-embed-router/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/altrup/discord-embed-router/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/altrup/discord-embed-router/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/altrup/discord-embed-router/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/altrup/discord-embed-router/compare/v1.2.0...v1.3.0
