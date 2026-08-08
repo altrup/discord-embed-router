@@ -147,3 +147,8 @@ vite.config.ts.timestamp-*
 
 # demo profile store written at runtime
 profiles.json
+
+# lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

@@ -144,3 +144,8 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

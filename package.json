@@ -54,6 +54,7 @@
 	},
 	"type": "commonjs",
 	"workspaces": [
+		".",
 		"examples/basic-bot"
 	],
 	"devDependencies": {

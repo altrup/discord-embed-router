@@ -1,0 +1,8 @@
+packages:
+  - "."
+  - "examples/*"
+
+linkWorkspacePackages: true
+
+allowBuilds:
+  esbuild: true
