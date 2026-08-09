@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-09
+
+### Added
+
+- `dispatch()` accepts context menu command interactions, both user and message, so an entry under a right-click's Apps submenu can route into an embed the same way a slash command does. Previously only components, chat input commands, and modal submits were accepted, and anything else threw `Interactions type is not supported`. The supported set is now every interaction the router can reply to, i.e. everything discord.js reports as repliable; autocomplete is still rejected, since it can only answer with `respond()` and has no `reply`/`deferReply`.
+
+### Changed
+
+- `EmbedRouter.isSupportedInteraction` narrows its argument, returning `interaction is RepliableInteraction` rather than `boolean`. Callers gain narrowing for free, but one that previously read a component-only property (e.g. `customId`) inside the `if` now needs its own guard, so this is a type-level break for TypeScript consumers even though runtime behavior is unchanged.
+
+### Fixed
+
+- The `interactionCreate` listener picked the interactions it handles by excluding chat input commands from the supported set, which held only while nothing else in that set lacked a `customId`. It now tests for a `customId` carrying this router's prefix directly, so widening the supported set above cannot route a command interaction down the component path.
+
 ## [1.4.2] - 2026-08-08
 
 ### Fixed
