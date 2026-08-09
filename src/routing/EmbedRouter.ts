@@ -7,6 +7,7 @@ import {
 	Message,
 	MessageFlags,
 	MessageFlagsBitField,
+	RepliableInteraction,
 } from "discord.js";
 import { Path } from "path-to-regexp";
 
@@ -600,12 +601,12 @@ export class EmbedRouter<
 			// destroyed mid-flight (e.g. by a handler triggered from this same
 			// event loop turn); nothing left to dispatch to
 			if (this.#destroyed) return;
+			// only the interactions carrying a customId this router issued
 			if (
-				!this.isSupportedInteraction(interaction) ||
-				interaction.isChatInputCommand()
+				!("customId" in interaction) ||
+				!interaction.customId.startsWith(this.#idPrefix)
 			)
-				return;
-			if (!interaction.customId.startsWith(this.#idPrefix)) return; // don't throw any errors
+				return; // don't throw any errors
 
 			// modal submits shown from a command have no message; key the queue by
 			// interaction so they don't contend with anything
@@ -656,7 +657,9 @@ export class EmbedRouter<
 	 * @param interaction the interaction to check
 	 * @returns if interaction is a supported type
 	 */
-	public isSupportedInteraction(interaction: Interaction) {
+	public isSupportedInteraction(
+		interaction: Interaction,
+	): interaction is RepliableInteraction {
 		return isSupportedInteraction(interaction);
 	}
 

@@ -5,6 +5,7 @@ import {
 	Client,
 	MessageFlags,
 	ModalSubmitInteraction,
+	UserContextMenuCommandInteraction,
 } from "discord.js";
 import { Path, Token } from "path-to-regexp";
 import { expect, test, vi } from "vitest";
@@ -38,6 +39,7 @@ const mockButtonInteraction = (
 		isAnySelectMenu: () => false,
 		isChatInputCommand: () => false,
 		isModalSubmit: () => false,
+		isRepliable: () => true,
 		message: { id: "123456789", flags: { has: () => false } },
 		channel: null,
 		deferUpdate: vi.fn(),
@@ -69,6 +71,7 @@ const mockModalSubmitInteraction = (
 		isAnySelectMenu: () => false,
 		isChatInputCommand: () => false,
 		isModalSubmit: () => true,
+		isRepliable: () => true,
 		fields: { getTextInputValue: () => "typed value" },
 		message: { id: "123456789", flags: { has: () => false } },
 		channel: null,
@@ -82,6 +85,36 @@ const mockModalSubmitInteraction = (
 			.mockResolvedValue({ id: "123456789", flags: { has: () => false } }),
 		...overrides,
 	} as unknown as ModalSubmitInteraction;
+};
+
+const mockUserContextMenuInteraction = (
+	overrides: Partial<UserContextMenuCommandInteraction> = {},
+): UserContextMenuCommandInteraction => {
+	return {
+		id: `interaction-${nextInteractionId++}`,
+		commandName: "Ring",
+		createdTimestamp: Date.now(),
+		replied: false,
+		deferred: false,
+		isAutocomplete: () => false,
+		isMessageComponent: () => false,
+		isButton: () => false,
+		isAnySelectMenu: () => false,
+		isChatInputCommand: () => false,
+		isModalSubmit: () => false,
+		isContextMenuCommand: () => true,
+		isUserContextMenuCommand: () => true,
+		isRepliable: () => true,
+		targetUser: { id: "222222222" },
+		channel: null,
+		deferReply: vi.fn(),
+		reply: vi.fn(),
+		editReply: vi.fn(),
+		fetchReply: vi
+			.fn()
+			.mockResolvedValue({ id: "123456789", flags: { has: () => false } }),
+		...overrides,
+	} as unknown as UserContextMenuCommandInteraction;
 };
 
 test("No id collisions", () => {
@@ -151,6 +184,40 @@ test("methods other than destroy() throw after destroy()", () => {
 		"has been destroyed",
 	);
 	expect(() => embedRouter.setClient(client)).toThrow("has been destroyed");
+});
+
+test("Router dispatch handles a context menu command interaction", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+
+	const handler = vi.fn(() => ({ redirect: "/ringed" }));
+	embedRouter.post("/ring/user", handler);
+	embedRouter.get("/ringed", () => ({ content: "ringing" }));
+
+	const interaction = mockUserContextMenuInteraction();
+	await embedRouter.dispatch(interaction, "/ring/user", { method: "POST" });
+
+	expect(handler).toHaveBeenCalled();
+	expect(interaction.reply).toHaveBeenCalled();
+});
+
+test("Router dispatch rejects an autocomplete interaction", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	embedRouter.get("/test", () => ({}));
+
+	const interaction = mockUserContextMenuInteraction({
+		isRepliable: () => false,
+	} as unknown as Partial<UserContextMenuCommandInteraction>);
+
+	const error = await embedRouter
+		.dispatch(interaction, "/test")
+		.then((): Error | undefined => undefined)
+		.catch((e: Error) => e);
+
+	expect(error?.cause).toMatchObject({
+		message: expect.stringContaining("not supported"),
+	});
 });
 
 test("Router dispatch calls route handler with data", async () => {
