@@ -138,12 +138,14 @@ export class RouteRegistry<Globals, Session, Locals> {
 			locals,
 			values,
 			trigger,
+			aroundHandler = (run) => run(),
 		}: {
 			interaction: Interaction;
 			method?: Method;
 			locals: Locals | undefined;
 			values?: string[] | undefined;
 			trigger: Exclude<RouteInfo["trigger"], "redirect">;
+			aroundHandler?: <T>(run: () => T | Promise<T>) => T | Promise<T>;
 		},
 	): Promise<
 		| {
@@ -240,15 +242,17 @@ export class RouteRegistry<Globals, Session, Locals> {
 				}
 
 				try {
-					routeResult = await route.handler(this.#embedRouter, interaction, {
-						...state,
-						session:
-							currentMethod === "MODAL"
-								? this.#sessionManager.readOnly(
-										this.#sessionManager.open(interaction, messageId),
-									)
-								: this.#sessionManager.open(interaction, messageId),
-					});
+					routeResult = await aroundHandler(() =>
+						route.handler(this.#embedRouter, interaction, {
+							...state,
+							session:
+								currentMethod === "MODAL"
+									? this.#sessionManager.readOnly(
+											this.#sessionManager.open(interaction, messageId),
+										)
+									: this.#sessionManager.open(interaction, messageId),
+						}),
+					);
 				} catch (e) {
 					throw Object.assign(toError(e), { [ROUTE_INFO]: info });
 				}

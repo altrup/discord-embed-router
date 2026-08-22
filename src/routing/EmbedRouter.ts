@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { EventEmitter } from "node:events";
 
 import {
@@ -8,6 +9,7 @@ import {
 	MessageFlags,
 	MessageFlagsBitField,
 	RepliableInteraction,
+	Snowflake,
 } from "discord.js";
 import { Path } from "path-to-regexp";
 
@@ -59,6 +61,16 @@ type EmbedRouterEvents = {
 	];
 };
 
+type HandlerScope = {
+	interaction: Interaction;
+	queueKey: Snowflake;
+	active: boolean;
+};
+
+type InternalDispatchOptions<Locals> = DispatchOptions<Locals> & {
+	trigger: Exclude<RouteInfo["trigger"], "redirect">;
+};
+
 export class EmbedRouter<
 	Globals = Unused,
 	Session = Unused,
@@ -100,10 +112,8 @@ export class EmbedRouter<
 	// serializes dispatch per message, so concurrent interactions on the same
 	// message can't interleave their session reads/writes
 	#messageQueue: MessageQueue = new MessageQueue();
-	// interactions currently mid-dispatch; catches a handler calling dispatch()
-	// on its own interaction (racing the response dispatch is about to send),
-	// which a redirect (including to MODAL) always replaces
-	#dispatchingInteractions: WeakSet<Interaction> = new WeakSet();
+	// tracks the active handler so nested dispatches cannot deadlock its queue
+	#handlerScope = new AsyncLocalStorage<HandlerScope>();
 	// holds registered routes and resolves paths against them; constructed
 	// once #encoder is assigned in the constructor body, so it's declared
 	// here but assigned there
@@ -194,6 +204,7 @@ export class EmbedRouter<
 		this.#routeRegistry.clear();
 		this.#cleanupManager.clearAll();
 		this.#sessionManager.clearAll();
+		this.#handlerScope.disable();
 		this.#globals = undefined;
 		this.#localsProvider = undefined;
 	}
@@ -387,31 +398,80 @@ export class EmbedRouter<
 		path: P,
 		options: DispatchOptions<Locals> = {},
 	) {
-		return this.#dispatch("dispatch", interaction, path, options);
+		return this.#queuedDispatch(interaction, path, {
+			...options,
+			trigger: "dispatch",
+		});
+	}
+
+	// what an interaction's work is serialized under: the message it edits, or
+	// itself when there is none
+	static #queueKeyOf(interaction: Interaction): Snowflake {
+		const messageId =
+			"message" in interaction ? interaction.message?.id : undefined;
+		return messageId ?? interaction.id;
+	}
+
+	async #runQueued<T>(interaction: Interaction, run: () => Promise<T>) {
+		this.#assertAlive();
+		const queueKey = EmbedRouter.#queueKeyOf(interaction);
+		const acknowledgement =
+			this.#messageQueue.isBusy(queueKey) &&
+			"deferUpdate" in interaction &&
+			interaction.message &&
+			!interaction.replied &&
+			!interaction.deferred
+				? interaction.deferUpdate()
+				: undefined;
+		void acknowledgement?.catch(() => undefined);
+		return this.#messageQueue.run(queueKey, async () => {
+			await acknowledgement;
+			return run();
+		});
+	}
+
+	// every dispatch enters here and waits its turn on the message
+	async #queuedDispatch<P extends Path = Path>(
+		interaction: Interaction,
+		path: P,
+		options: InternalDispatchOptions<Locals>,
+	) {
+		const method = options.method ?? "GET";
+		const queueKey = EmbedRouter.#queueKeyOf(interaction);
+		const active = this.#handlerScope.getStore();
+		if (active?.active && active.queueKey === queueKey) {
+			if (active.interaction === interaction)
+				throw new ConfigError(
+					"Cannot dispatch() an interaction that's still being dispatched; return a redirect instead of calling dispatch() on your own interaction",
+					{ method, path },
+				);
+			throw new ConfigError(
+				`Dispatching ${pathToString(path, false)} from inside a handler for the same message would deadlock. Report it once the handler has returned instead`,
+				{ method, path },
+			);
+		}
+
+		return this.#runQueued(interaction, () =>
+			this.#dispatch(interaction, path, options),
+		);
 	}
 
 	async #dispatch<P extends Path = Path>(
-		trigger: Exclude<RouteInfo["trigger"], "redirect">,
 		interaction: Interaction,
 		path: P,
 		{
+			trigger,
 			method = "GET",
 			queryParams,
 			flags,
 			locals = this.#localsProvider?.(this, interaction),
 			values,
-		}: DispatchOptions<Locals> = {},
+		}: InternalDispatchOptions<Locals>,
 	) {
 		let message: Message | undefined;
 		// kept outside the try so a failure after the handler returned -- an
 		// acknowledgement Discord rejects, say -- still reports its route
 		let routeInfo: RouteInfo | undefined;
-		if (this.#dispatchingInteractions.has(interaction))
-			throw new ConfigError(
-				"Cannot dispatch() an interaction that's still being dispatched; return a redirect instead of calling dispatch() on your own interaction",
-				{ method, path },
-			);
-		this.#dispatchingInteractions.add(interaction);
 		try {
 			this.#assertAlive();
 			if (!this.isSupportedInteraction(interaction))
@@ -437,6 +497,32 @@ export class EmbedRouter<
 				method,
 				locals,
 				values,
+				aroundHandler: (run) => {
+					const scope: HandlerScope = {
+						interaction,
+						queueKey: EmbedRouter.#queueKeyOf(interaction),
+						active: true,
+					};
+					return this.#handlerScope.run(scope, () => {
+						try {
+							const result = run();
+							if (
+								result !== null &&
+								(typeof result === "object" || typeof result === "function") &&
+								"then" in result &&
+								typeof result.then === "function"
+							)
+								return Promise.resolve(result).finally(() => {
+									scope.active = false;
+								});
+							scope.active = false;
+							return result;
+						} catch (e) {
+							scope.active = false;
+							throw e;
+						}
+					});
+				},
 				trigger,
 			});
 			if (resolved === false)
@@ -581,7 +667,6 @@ export class EmbedRouter<
 				},
 			);
 		} finally {
-			this.#dispatchingInteractions.delete(interaction);
 			if (!message || !this.#cleanupManager.has(message.id)) {
 				// no cleanup was set, drop the working session copy
 				this.#sessionManager.discard(interaction);
@@ -608,14 +693,7 @@ export class EmbedRouter<
 			)
 				return; // don't throw any errors
 
-			// modal submits shown from a command have no message; key the queue by
-			// interaction so they don't contend with anything
-			const messageId = interaction.message?.id ?? interaction.id;
-			// another interaction on this message is still being handled; ack
-			// immediately so this one doesn't blow its own 3s window while queued
-			if (this.#messageQueue.isBusy(messageId)) await interaction.deferUpdate();
-
-			await this.#messageQueue.run(messageId, async () => {
+			await this.#runQueued(interaction, async () => {
 				const route = this.#interactionDecoder.decode(
 					interaction,
 					this.idPrefix,
@@ -625,9 +703,9 @@ export class EmbedRouter<
 						`Invalid component found: id ${interaction.customId}`,
 					);
 
-				await this.#dispatch("interaction", interaction, route.path, {
+				await this.#dispatch(interaction, route.path, {
+					trigger: "interaction",
 					method: route.method,
-					locals: this.#localsProvider?.(this, interaction),
 					values: route.values,
 					// a dispatch with a message edits it, so carried flags
 					// (creation-time only) are dropped
@@ -635,7 +713,7 @@ export class EmbedRouter<
 						? undefined
 						: (route.flags as InteractionReplyOptions["flags"]),
 					// cast: the decoder never pairs flags with a MODAL method
-				} as DispatchOptions<Locals>);
+				} as InternalDispatchOptions<Locals>);
 			});
 		} catch (e: unknown) {
 			// a stale/forged customId isn't a misconfiguration, so it's reported

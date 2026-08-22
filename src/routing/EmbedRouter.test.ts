@@ -166,6 +166,36 @@ test("destroy() clears registered routes and rejects further dispatch", async ()
 	).rejects.toThrow("has been destroyed");
 });
 
+test("dispatch on a destroyed router rejects before acknowledging a busy interaction", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const first = mockButtonInteraction("");
+	const second = mockButtonInteraction("");
+	let release!: () => void;
+	let started!: () => void;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	const firstStarted = new Promise<void>((resolve) => (started = resolve));
+
+	embedRouter.get("/slow", async () => {
+		started();
+		await gate;
+		return {};
+	});
+	const slow = embedRouter.dispatch(first, "/slow");
+	await firstStarted;
+	embedRouter.destroy();
+	const rejected = embedRouter.dispatch(second, "/slow").catch((e) => e);
+	const outcome = await Promise.race([
+		rejected,
+		new Promise((resolve) => setTimeout(() => resolve("hung"), 20)),
+	]);
+	release();
+	await Promise.all([slow, rejected]);
+
+	expect(outcome).toBeInstanceOf(Error);
+	expect(second.deferUpdate).not.toHaveBeenCalled();
+});
+
 test("destroy() is idempotent", () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -719,6 +749,235 @@ test("a handler's own setTimeout calling dispatch() on the same interaction work
 	}
 });
 
+// real deferred work settles a macrotask or more after the handler returned
+const work = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("the router a handler receives can dispatch its own interaction once the handler has returned", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+
+	const outcome = vi.fn().mockReturnValue({ content: "outcome" });
+	embedRouter.get("/outcome", outcome);
+	// a placeholder now, the real outcome when the work settles
+	let reported: Promise<unknown> | undefined;
+	embedRouter.get("/pending", (router) => {
+		reported = work().then(() => router.dispatch(interaction, "/outcome"));
+		return { content: "pending" };
+	});
+
+	await embedRouter.dispatch(interaction, "/pending");
+	await reported;
+
+	expect(outcome).toHaveBeenCalledTimes(1);
+});
+
+test("deferred dispatches on one message run in the order their work settled", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+
+	const order: string[] = [];
+	embedRouter.get("/first", async () => {
+		order.push("first");
+		return { content: "first" };
+	});
+	embedRouter.get("/second", () => {
+		order.push("second");
+		return { content: "second" };
+	});
+
+	let reported: Promise<unknown> | undefined;
+	embedRouter.get("/pending", (router) => {
+		reported = work().then(() =>
+			Promise.all([
+				router.dispatch(interaction, "/first"),
+				router.dispatch(interaction, "/second"),
+			]),
+		);
+		return { content: "pending" };
+	});
+
+	await embedRouter.dispatch(interaction, "/pending");
+	await reported;
+
+	expect(order).toEqual(["first", "second"]);
+});
+
+test("dispatch() queues behind work already running on the same message", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	// two interactions, one message: the default mock's id is shared
+	const first = mockButtonInteraction("");
+	const second = mockButtonInteraction("");
+
+	const order: string[] = [];
+	let release: (() => void) | undefined;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	embedRouter.get("/slow", async () => {
+		await gate;
+		order.push("slow");
+		return { content: "slow" };
+	});
+	embedRouter.get("/quick", () => {
+		order.push("quick");
+		return { content: "quick" };
+	});
+
+	const slow = embedRouter.dispatch(first, "/slow");
+	const quick = embedRouter.dispatch(second, "/quick");
+	release?.();
+	await Promise.all([slow, quick]);
+
+	expect(order).toEqual(["slow", "quick"]);
+});
+
+test("a handler dispatching a different interaction on another message inline works", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const other = mockButtonInteraction("", {
+		message: { id: "other-message", flags: { has: () => false } },
+	} as unknown as Partial<ButtonInteraction>);
+
+	const notified = vi.fn().mockReturnValue({ content: "notified" });
+	embedRouter.get("/notify", notified);
+	embedRouter.get("/a", async (router) => {
+		await router.dispatch(other, "/notify");
+		return { content: "ok" };
+	});
+
+	await embedRouter.dispatch(mockButtonInteraction(""), "/a");
+
+	expect(notified).toHaveBeenCalledTimes(1);
+});
+
+test("a handler dispatching a different interaction on its own message inline throws instead of hanging", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	// same message id as the default mock, so both contend for one queue key
+	const sibling = mockButtonInteraction("");
+
+	embedRouter.get("/notify", () => ({ content: "notified" }));
+	embedRouter.get("/a", async (router) => {
+		await router.dispatch(sibling, "/notify");
+		return { content: "ok" };
+	});
+
+	await expect(
+		embedRouter.dispatch(mockButtonInteraction(""), "/a"),
+	).rejects.toMatchObject({
+		cause: { message: expect.stringContaining("would deadlock") },
+	});
+});
+
+test("public dispatch defers a component before it waits on a busy message", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const first = mockButtonInteraction("");
+	const second = mockButtonInteraction("");
+	vi.mocked(second.deferUpdate).mockImplementation(async () => {
+		(second as unknown as { deferred: boolean }).deferred = true;
+		return undefined as never;
+	});
+	let release!: () => void;
+	let started!: () => void;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	const firstStarted = new Promise<void>((resolve) => (started = resolve));
+
+	embedRouter.get("/slow", async () => {
+		started();
+		await gate;
+		return { content: "slow" };
+	});
+	embedRouter.get("/quick", () => ({ content: "quick" }));
+
+	const slow = embedRouter.dispatch(first, "/slow");
+	await firstStarted;
+	const quick = embedRouter.dispatch(second, "/quick");
+	const acknowledgedWhileWaiting = vi.mocked(second.deferUpdate).mock.calls
+		.length;
+	release();
+	await Promise.all([slow, quick]);
+
+	expect(acknowledgedWhileWaiting).toBe(1);
+	expect(second.editReply).toHaveBeenCalledOnce();
+	expect(second.update).not.toHaveBeenCalled();
+});
+
+test("a synchronous handler's microtask can dispatch after the handler returns", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+	const outcome = vi.fn().mockReturnValue({ content: "outcome" });
+	let reported: Promise<unknown> | undefined;
+
+	embedRouter.get("/outcome", outcome);
+	embedRouter.get("/pending", (router) => {
+		reported = Promise.resolve().then(() =>
+			router.dispatch(interaction, "/outcome"),
+		);
+		return { content: "pending" };
+	});
+
+	await embedRouter.dispatch(interaction, "/pending");
+	await reported;
+
+	expect(outcome).toHaveBeenCalledOnce();
+});
+
+test("a thenable handler stays active until the thenable settles", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+
+	embedRouter.get("/pending", ((router: EmbedRouter) => ({
+		then(
+			resolve: (value: undefined) => void,
+			reject: (reason: unknown) => void,
+		) {
+			void router
+				.dispatch(interaction, "/outcome")
+				.then(() => resolve(undefined), reject);
+		},
+	})) as unknown as Parameters<typeof embedRouter.get>[1]);
+	embedRouter.get("/outcome", () => ({ content: "outcome" }));
+
+	const outcome = await Promise.race([
+		embedRouter.dispatch(interaction, "/pending").catch((e) => e),
+		new Promise((resolve) => setTimeout(() => resolve("hung"), 20)),
+	]);
+	expect(outcome).toMatchObject({
+		cause: { message: expect.stringContaining("still being dispatched") },
+	});
+});
+
+test("deferred work from a redirect source is not scoped to the destination handler", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const interaction = mockButtonInteraction("");
+	const outcome = vi.fn().mockReturnValue({ content: "outcome" });
+	let start!: () => void;
+	const started = new Promise<void>((resolve) => (start = resolve));
+	let reported: Promise<unknown> | undefined;
+
+	embedRouter.get("/outcome", outcome);
+	embedRouter.get("/source", (router) => {
+		reported = started
+			.then(() => router.dispatch(interaction, "/outcome"))
+			.catch((e) => e);
+		return { redirect: "/destination" };
+	});
+	embedRouter.get("/destination", async () => {
+		start();
+		await Promise.resolve();
+		return { content: "destination" };
+	});
+
+	await embedRouter.dispatch(interaction, "/source");
+	expect(await reported).toBeUndefined();
+	expect(outcome).toHaveBeenCalledOnce();
+});
+
 test("a non-GET route handler returning content instead of a redirect throws, even past TypeScript", async () => {
 	const client = mockClient();
 	const embedRouter = new EmbedRouter(client);
@@ -778,6 +1037,87 @@ test("a second interaction on a busy message is deferred immediately, then runs 
 		expect(order).toEqual(["first-start", "first-end", "second"]),
 	);
 	expect(second.deferUpdate).toHaveBeenCalled();
+});
+
+test("a malformed interaction waits and acknowledges when its message is busy", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter(client);
+	const onError = vi.fn();
+	let release!: () => void;
+	let started!: () => void;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	const firstStarted = new Promise<void>((resolve) => (started = resolve));
+
+	embedRouter.onError(onError);
+	embedRouter.get("/slow", async () => {
+		started();
+		await gate;
+		return {};
+	});
+	const first = mockButtonInteraction(
+		embedRouter.encodePath("/slow", { method: "GET" }),
+	);
+	const malformed = mockButtonInteraction(`${embedRouter.idPrefix}garbage`);
+
+	client.emit("interactionCreate", first);
+	await firstStarted;
+	client.emit("interactionCreate", malformed);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	const errorsWhileWaiting = onError.mock.calls.length;
+	release();
+	await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+
+	expect(malformed.deferUpdate).toHaveBeenCalledOnce();
+	expect(errorsWhileWaiting).toBe(0);
+});
+
+test("a queued listener interaction gets its locals after earlier message work finishes", async () => {
+	const client = mockClient();
+	const embedRouter = new EmbedRouter<undefined, undefined, string>(client);
+	const order: string[] = [];
+	let release!: () => void;
+	let started!: () => void;
+	let finished!: () => void;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	const firstStarted = new Promise<void>((resolve) => (started = resolve));
+	const secondFinished = new Promise<void>((resolve) => (finished = resolve));
+
+	embedRouter.get("/first", async () => {
+		order.push("first-start");
+		started();
+		await gate;
+		order.push("first-end");
+		return {};
+	});
+	embedRouter.get("/second", () => {
+		order.push("second");
+		finished();
+		return {};
+	});
+	const first = mockButtonInteraction(
+		embedRouter.encodePath("/first", { method: "GET" }),
+	);
+	const second = mockButtonInteraction(
+		embedRouter.encodePath("/second", { method: "GET" }),
+	);
+	embedRouter.setLocalsProvider((_router, interaction) => {
+		order.push(interaction === first ? "first-locals" : "second-locals");
+		return "locals";
+	});
+
+	client.emit("interactionCreate", first);
+	await firstStarted;
+	client.emit("interactionCreate", second);
+	release();
+	await secondFinished;
+
+	expect(order).toEqual([
+		"first-locals",
+		"first-start",
+		"first-end",
+		"second-locals",
+		"second",
+	]);
 });
 
 test("dispatch merges its queryParams option into the path like encodePath does", async () => {
