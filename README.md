@@ -108,6 +108,8 @@ Pass a `Session` type parameter to `EmbedRouter<Globals, Session, Locals>` and u
 
 A `GET` handler can return `{ cleanup, timeout }` alongside its content. If no further interaction lands on that message before `timeout` ms, `cleanup` runs and its return value (if any) is applied to the message, which is handy for expiring a form or disabling stale buttons.
 
+For public messages, cleanup results require a cached interaction channel. If your discord.js client does not otherwise cache channels, enable `Partials.Channel`.
+
 ### Observability
 
 The router is an `EventEmitter` with two events:

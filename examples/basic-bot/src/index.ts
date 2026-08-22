@@ -15,6 +15,7 @@ import {
 	Client,
 	Collection,
 	MessageFlags,
+	Partials,
 } from "discord.js";
 
 import { ProfileStore } from "@lib/profile-store";
@@ -22,7 +23,7 @@ import { Globals, Locals, Session } from "@routes/types";
 
 const client = new Client({
 	intents: [],
-	partials: [],
+	partials: [Partials.Channel],
 });
 
 // set up embed router
